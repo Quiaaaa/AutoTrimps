@@ -410,7 +410,6 @@ function showHideUnusedGraphs() {
 
     }
 }
-
 //TODO update to new data var
 function initializeData() {
     null === allSaveData && (allSaveData = []), 0 === allSaveData.length && pushData();
@@ -446,22 +445,6 @@ function gatherInfo() {
     GraphsVars.aWholeNewPortal = GraphsVars.currentPortal != getTotalPortals(true);
     if (GraphsVars.aWholeNewPortal) {
         GraphsVars.currentPortal = getTotalPortals(true);
-        filteredLoot = {
-            produced: {
-                metal: 0,
-                wood: 0,
-                food: 0,
-                gems: 0,
-                fragments: 0,
-            },
-            looted: {
-                metal: 0,
-                wood: 0,
-                food: 0,
-                gems: 0,
-                fragments: 0,
-            },
-        };
     }
     GraphsVars.aWholeNewWorld = GraphsVars.currentworld != game.global.world;
     if (GraphsVars.aWholeNewWorld) {
@@ -1161,90 +1144,6 @@ function setColor(tmp) {
     }
     return tmp;
 }
-
-var filteredLoot = {
-    produced: {
-        metal: 0,
-        wood: 0,
-        food: 0,
-        gems: 0,
-        fragments: 0,
-    },
-    looted: {
-        metal: 0,
-        wood: 0,
-        food: 0,
-        gems: 0,
-        fragments: 0,
-    },
-};
-var lootData = {
-    metal: [],
-    wood: [],
-    food: [],
-    gems: [],
-    fragments: [],
-};
-
-function filterLoot(loot, amount, jest, fromGather) {
-    if (loot != "wood" && loot != "metal" && loot != "food" && loot != "gems" && loot != "fragments") return;
-    if (jest) {
-        filteredLoot.produced[loot] += amount;
-        filteredLoot.looted[loot] -= amount;
-    } else if (fromGather) filteredLoot.produced[loot] += amount;
-    else filteredLoot.looted[loot] += amount;
-}
-
-function getLootData() {
-    var loots = ["metal", "wood", "food", "gems", "fragments"];
-    for (var r in loots) {
-        var name = loots[r];
-        if (filteredLoot.produced[name]) lootData[name].push(filteredLoot.looted[name] / filteredLoot.produced[name]);
-        if (lootData[name].length > 60) lootData[name].shift();
-    }
-}
-
-setInterval(getLootData, 15000);
-
-(function () {
-    var resAmts;
-
-    function storeResAmts() {
-        resAmts = {};
-        for (let item in lootData) {
-            resAmts[item] = game.resources[item].owned;
-        }
-    }
-
-    const oldJestimpLoot = game.badGuys.Jestimp.loot;
-    game.badGuys.Jestimp.loot = function () {
-        storeResAmts();
-        var toReturn = oldJestimpLoot.apply(this, arguments);
-        for (let item in resAmts) {
-            var gained = game.resources[item].owned - resAmts[item];
-            if (gained > 0) {
-                filterLoot(item, gained, true);
-            }
-        }
-        return toReturn;
-    };
-
-    const oldChronoimpLoot = game.badGuys.Chronoimp.loot;
-    game.badGuys.Chronoimp.loot = function () {
-        storeResAmts();
-        var toReturn = oldChronoimpLoot.apply(this, arguments);
-        for (let item in resAmts) {
-            var gained = game.resources[item].owned - resAmts[item];
-            if (gained > 0) {
-                filterLoot(item, gained, true);
-            }
-        }
-        return toReturn;
-    };
-
-    const oldFunction = window.addResCheckMax;
-    window.addResCheckMax = (a, b, c, d, e, f) => filterLoot(a, b, null, d, f) || oldFunction(a, b, c, d, e, f);
-})();
 
 function lookUpZoneData(a, b) {
     null == b && (b = getTotalPortals(true));
