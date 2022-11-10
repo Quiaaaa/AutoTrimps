@@ -1,3 +1,27 @@
+var basepath = ''
+function safeSetItems(name, data) {
+    try {
+        localStorage.setItem(name, data);
+    } catch (e) {
+        if (e.code == 22) {
+            // Storage full, maybe notify user or do some clean-up
+            debug("Error: LocalStorage is full, or error. Attempt to delete some portals from your graph or restart browser.");
+        }
+    }
+}
+
+var enableDebug = false;
+function debug(message, type, lootIcon) {
+    var output = true;
+    if (output) {
+        if (enableDebug)
+            console.debug(0 + ' ' + message);
+    }
+}
+
+var MODULES = {}
+
+
 var portalSaveData = {}
 var allSaveData = [],
     graphData = [],
@@ -32,7 +56,7 @@ for (var item in (($universeSel.id = "universeSelection"), $universeSel.setAttri
 
 var chart1;
 
-function Graph(dataVar, universe, selectorText, additionalParams) {
+function Graph(dataVar, universe, selectorText, additionalParams = {}) {
     // graphTitle, customFunction, useAccumulator, xTitle, yTitle, formatter, valueSuffix, xminFloor, yminFloor, yType
     this.dataVar = dataVar
     this.universe = universe; // false, 1, 2
@@ -40,22 +64,26 @@ function Graph(dataVar, universe, selectorText, additionalParams) {
     this.graphTitle = this.selectorText;
     this.customFunction;
     this.useAccumulator = false;
-    this.xTitle = "Zone"
+    this.xTitle = "Zone";
     this.yTitle = this.selectorText;
-    this.formatter;
-    this.valueSuffix;
-    this.series; // TODO NOT SURE WHAT TO DO HERE
+    this.formatter = null;
+    this.valueSuffix = "";
+    //this.series; // TODO NOT SURE WHAT TO DO HERE
     this.xminFloor = 1;
     this.yminFloor = null;
     this.yType = "Linear";
+    this.graphData = [];
     this.graphFunc = function () {
-        this.graphData = allPurposeGraph(this.dataVar, true, "number");
+        this.allPurposeGraph(this.dataVar, true, "number");
     }
     for (const [key, value] of Object.entries(additionalParams)) {
-        if (Object.hasOwn(this, key)) this[key] = value;
+        if (Object.hasOwnProperty(this, key)) this[key] = value;
     }
-    //function setGraph(title, xTitle, yTitle, valueSuffix, formatter, series, yType, xminFloor, yminFloor, additionalParams)
-    this.setGraph = function (additionalParams) {
+
+    // renders a graph with Highcharts
+    this.displayGraph = function () {
+        // Original signature
+        // function setGraph(title, xTitle, yTitle, valueSuffix, formatter, series, yType, xminFloor, yminFloor, additionalParams)
         // TODO 100% sure I've fucked up something here
         chart1 = new Highcharts.Chart({
             chart: {
@@ -102,7 +130,7 @@ function Graph(dataVar, universe, selectorText, additionalParams) {
                         color: "#808080",
                     },
                 ],
-                type: yType,
+                type: this.yType,
                 dateTimeLabelFormats: {
                     // TODO fix these for 1+ days
                     second: "%H:%M:%S",
@@ -124,48 +152,52 @@ function Graph(dataVar, universe, selectorText, additionalParams) {
                 verticalAlign: "middle",
                 borderWidth: 0,
             },
-            series: this.series,
-            additionalParams,
+            series: this.graphData,
+            additionalParams: {},
         });
     }
+
+    //
     this.setGraphData = function () {
+        let oldData = JSON.stringify(this.graphData)
         this.graphFunc();
-        formatter =
-            this.formatter ||
-            function () {
-                var ser = this.series;
-                return '<span style="color:' + ser.color + '" >●</span> ' + ser.name + ": <b>" + prettify(this.y) + valueSuffix + "</b><br>";
-            };
+        this.formatter = function () {
+            var ser = this.series; // this is the most fucking confusing use of 'this' ever, this function is called by a highcharts object
+            return '<span style="color:' + ser.color + '" >●</span> ' + ser.name + ": <b>" + prettify(this.y) + valueSuffix + "</b><br>";
+        };
         var additionalParams = {};
-        if (oldData != JSON.stringify(graphData)) {
+        if (oldData != JSON.stringify(this.graphData)) {
+            this.displayGraph();
             saveSelectedGraphs();
-            this.setGraph();
+
         }
         if (document.getElementById("rememberCB").checked) {
             applyRememberedSelections();
         }
     }
-
+    // Converts data into highCharts format, and optionally transforms it with customFunction or useAccumulator
+    // TODO  customFunction and useAccumulator
     this.allPurposeGraph = function (item, extraChecks, typeCheck) {
         var currentPortal = -1;
         var currentZone = 0;
         var accumulator = 0;
-        graphData = [];
+        this.graphData = [];
         for (const portal of Object.values(portalSaveData)) {
             if (!(item in portal.perZoneData)) continue;
             if (typeCheck) { // null out data on typecheck, possibly not a great way to do this (old code continue'd past 'bad' data)
                 portal.perZoneData[item].forEach((z) => { if (typeof z != typeCheck) z = null })
             }
-            graphData.push({
+            this.graphData.push({
                 name: `Portal ${portal.totalPortals}: ${portal.challenge}`,
                 data: portal.perZoneData[item],
                 universe: portal.universe
             })
+            //TODO This is 100% not finished and I forget where I left off
             /*
             if (this.customFunction && !this.useAccumulator) {
                 graphData.data = graphData.data.map((a, b) => { let out = this.customFunction(a, b); return out < 0 ? 1 : out; });
             } else if (this.customFunction && this.useAccumulator) {
-                //TODO This is 100% not finished and I forget where I left off
+                
                 let tempData = graphData.data.map((a))
                     accumulator += this.customFunction(allSaveData[i], allSaveData[i - 1]);
                 if (accumulator < 0) accumulator = 1;
@@ -176,7 +208,6 @@ function Graph(dataVar, universe, selectorText, additionalParams) {
             }
             */
         }
-        return graphData
     }
 }
 
@@ -194,28 +225,17 @@ function drawGraph(a, b, refresh) {
     }
     var c = universe == 'Universe 1' ? document.getElementById("u1graphSelection") : universe == 'Universe 2' ? document.getElementById("u2graphSelection") : "Universe 1";
     if (a === undefined && b === undefined && c.value !== undefined && refresh !== undefined) {
-        setGraphData('Refresh');
-        setGraphData(c.value);
+        //setGraphData('Refresh'); // TODO AAA WHAT THE FUCK DOES REFRESH EVEN DO? 
+        graphList[c.value].setGraphData();
     }
-    a ? (c.selectedIndex--, 0 > c.selectedIndex && (c.selectedIndex = 0)) : b && c.selectedIndex != c.options.length - 1 && c.selectedIndex++, setGraphData(c.value);
+    a
+        ? (c.selectedIndex--, 0 > c.selectedIndex && (c.selectedIndex = 0))
+        : b && c.selectedIndex != c.options.length - 1 && c.selectedIndex++, graphList[c.value].setGraphData();
 }
 
 
-// TODO all of the data in the switch should be in graphList instead
+// TODO all of the data in the switch should be in graphList instead, as soon as I decide how to handle accumulators and custom functions
 function setGraphData(graph) {
-    var title,
-        xTitle,
-        yTitle,
-        yType,
-        valueSuffix,
-        series,
-        formatter,
-        xminFloor = 1,
-        yminFloor = null;
-    var precision = 0;
-    var oldData = JSON.stringify(graphData);
-    valueSuffix = "";
-
     switch (graph) {
         case "Refresh":
             graphData = [];
@@ -223,7 +243,7 @@ function setGraphData(graph) {
             title = "Refresh";
             xTitle = "Refresh";
             yTitle = "Refresh";
-            yType = "Linear";
+
             break;
         // TODO ALL OF THIS SHOULD BE MOVED TO graphList and the definition of a graph
         case "Void Maps":
@@ -255,7 +275,7 @@ function setGraphData(graph) {
             title = "Void Maps (completed)";
             xTitle = "Portal";
             yTitle = "Number of Void Maps";
-            yType = "Linear";
+
             break;
 
         case "Nullifium Gained":
@@ -294,49 +314,16 @@ function setGraphData(graph) {
             if (averagenulli) title = "Average " + title + " = " + averagenulli;
             xTitle = "Portal";
             yTitle = "Nullifium Gained";
-            yType = "Linear";
+
             break;
 
-
-        case "Clear Time #2":
-            graphData = allPurposeGraph("cleartime2", true, null, function specialCalc(e1, e2) {
-                return Math.round(e1.zonetime / 1000);
-            });
-            title = "(#2) Time to Clear Zone";
-            xTitle = "Zone";
-            yTitle = "Clear Time";
-            yType = "Linear";
-            valueSuffix = " Seconds";
-            break;
         case "Clear Time":
             graphData = allPurposeGraph("cleartime1", true, null, function specialCalc(e1, e2) {
                 return Math.round((e1.currentTime - e2.currentTime - (e1.portalTime - e2.portalTime)) / 1000);
             });
             title = "Time to clear zone";
-            xTitle = "Zone";
             yTitle = "Clear Time";
-            yType = "Linear";
             valueSuffix = " Seconds";
-            yminFloor = 0;
-            break;
-        case "Cumulative Clear Time #2":
-            graphData = allPurposeGraph(
-                "cumucleartime2",
-                true,
-                null,
-                function specialCalc(e1, e2) {
-                    return Math.round(e1.zonetime);
-                },
-                true
-            );
-            title = "(#2) Cumulative Time (at END of zone#)";
-            xTitle = "Zone";
-            yTitle = "Cumulative Clear Time";
-            yType = "datetime";
-            formatter = function () {
-                var ser = this.series;
-                return '<span style="color:' + ser.color + '" >●</span> ' + ser.name + ": <b>" + Highcharts.dateFormat("%H:%M:%S", this.y) + "</b><br>";
-            };
             yminFloor = 0;
             break;
         case "Cumulative Clear Time":
@@ -350,7 +337,6 @@ function setGraphData(graph) {
                 true
             );
             title = "Cumulative Time (at END of zone#)";
-            xTitle = "Zone";
             yTitle = "Cumulative Clear Time";
             yType = "datetime";
             formatter = function () {
@@ -359,15 +345,12 @@ function setGraphData(graph) {
             };
             yminFloor = 0;
             break;
-
         case "Helium - He/Hr":
             graphData = allPurposeGraph("heliumhr", true, null, function specialCalc(e1, e2) {
                 return Math.floor(e1.heliumOwned / ((e1.currentTime - e1.portalTime) / 3600000));
             });
             title = "Helium/Hour (Cumulative)";
-            xTitle = "Zone";
             yTitle = "Helium/Hour";
-            yType = "Linear";
             yminFloor = 0;
             precision = 2;
             break;
@@ -376,25 +359,19 @@ function setGraphData(graph) {
                 return Math.floor(e1.heliumOwned);
             });
             title = "Helium (Lifetime Total)";
-            xTitle = "Zone";
             yTitle = "Helium";
-            yType = "Linear";
             break;
         case "HeHr % / LifetimeHe":
             graphData = allPurposeGraph("hehr", true, "string");
             title = "He/Hr % of LifetimeHe";
-            xTitle = "Zone";
             yTitle = "He/Hr % of LifetimeHe";
-            yType = "Linear";
             yminFloor = 0;
             precision = 4;
             break;
         case "He % / LifetimeHe":
             graphData = allPurposeGraph("helife", true, "string");
             title = "He % of LifetimeHe";
-            xTitle = "Zone";
             yTitle = "He % of LifetimeHe";
-            yType = "Linear";
             yminFloor = 0;
             precision = 4;
             break;
@@ -403,9 +380,7 @@ function setGraphData(graph) {
                 return Math.floor(e1.radonOwned / ((e1.currentTime - e1.portalTime) / 3600000));
             });
             title = "Radon/Hour (Cumulative)";
-            xTitle = "Zone";
             yTitle = "Radon/Hour";
-            yType = "Linear";
             yminFloor = 0;
             precision = 2;
             break;
@@ -414,9 +389,7 @@ function setGraphData(graph) {
                 return Math.floor(e1.radonOwned / 1.03 ** e1.s3 / ((e1.currentTime - e1.portalTime) / 3600000));
             });
             title = "Radon/Hour (Cumulative, S3 Normalized)";
-            xTitle = "Zone";
             yTitle = "Radon/Hour";
-            yType = "Linear";
             yminFloor = 0;
             precision = 2;
             break;
@@ -425,62 +398,27 @@ function setGraphData(graph) {
                 return Math.floor(e1.radonOwned);
             });
             title = "Radon (Lifetime Total)";
-            xTitle = "Zone";
             yTitle = "Radon";
-            yType = "Linear";
             break;
         case "RnHr % / LifetimeRn":
             graphData = allPurposeGraph("rnhr", true, "string");
             title = "Rn/Hr % of LifetimeRn";
-            xTitle = "Zone";
             yTitle = "Rn/Hr % of LifetimeRn";
-            yType = "Linear";
             yminFloor = 0;
             precision = 4;
             break;
         case "Rn % / LifetimeRn":
             graphData = allPurposeGraph("rnlife", true, "string");
             title = "Rn % of LifetimeRn";
-            xTitle = "Zone";
             yTitle = "Rn % of LifetimeRn";
-            yType = "Linear";
             yminFloor = 0;
             precision = 4;
-            break;
-        case "Void Map History":
-            graphData = allPurposeGraph("voids", true, "number");
-            title = "Void Map History (voids finished during the same level acquired (with RunNewVoids) are not counted/tracked)";
-            xTitle = "Zone";
-            yTitle = "Number of Void Maps";
-            yType = "Linear";
-            break;
-        case "Map Bonus":
-            graphData = allPurposeGraph("mapbonus", true, "number");
-            title = "Map Bonus History";
-            xTitle = "Zone";
-            yTitle = "Map Bonus Stacks";
-            yType = "Linear";
-            break;
-        case "Coordinations":
-            graphData = allPurposeGraph("coord", true, "number");
-            title = "Unpurchased Coordinations History";
-            xTitle = "Zone";
-            yTitle = "Coordination";
-            yType = "Linear";
-            break;
-        case "Amalgamators":
-            graphData = allPurposeGraph("amals", true, "number");
-            title = "Amalgamators";
-            xTitle = "Zone";
-            yTitle = "Amalgamators";
-            yType = "Linear";
             break;
         case "Fluffy XP":
             graphData = allPurposeGraph("fluffy", true, "number");
             title = "Fluffy XP (Lifetime Total)";
             xTitle = "Zone (starts at 300)";
             yTitle = "Fluffy XP";
-            yType = "Linear";
             xminFloor = 300;
             break;
         case "Fluffy XP PerHour":
@@ -511,17 +449,13 @@ function setGraphData(graph) {
                 currentZone = allSaveData[i].world;
             }
             title = "Fluffy XP/Hour (Cumulative)";
-            xTitle = "Zone";
             yTitle = "Fluffy XP/Hour";
-            yType = "Linear";
             xminFloor = 1;
             break;
         case "Scruffy XP":
             graphData = allPurposeGraph("scruffy", true, "number");
             title = "Scruffy XP (Lifetime Total)";
-            xTitle = "Zone";
             yTitle = "Scruffy XP";
-            yType = "Linear";
             xminFloor = 0;
             break;
         case "Scruffy XP PerHour":
@@ -552,9 +486,7 @@ function setGraphData(graph) {
                 currentZone = allSaveData[i].world;
             }
             title = "Scruffy XP/Hour (Cumulative)";
-            xTitle = "Zone";
             yTitle = "Scruffy XP/Hour";
-            yType = "Linear";
             xminFloor = 1;
             break;
         case "OverkillCells":
@@ -584,23 +516,15 @@ function setGraphData(graph) {
                 currentZone = allSaveData[i].world;
             }
             title = "Overkilled Cells";
-            xTitle = "Zone";
             yTitle = "Overkilled Cells";
-            yType = "Linear";
             break;
-        default:
-            graphData = allPurposeGraph(graph.toLowerCase(), true, "number");
-            title = `${graph} History`;
-            xTitle = "Zone";
-            yTitle = graph;
-            yType = "Linear";
     }
 }
 
-
-//Graph(dataVar, universe, selectorText, additionalParams) {
+// Graph(dataVar, universe, selectorText, additionalParams) {
 // graphTitle, customFunction, useAccumulator, xTitle, yTitle, formatter, valueSuffix, xminFloor, yminFloor, yType
-const graphList = [
+// The only reason this is an object instead of an array is to make it easier for one function to do a lookup.  yay.
+const graphList = Object.fromEntries([
     //["hehr", 1, "Helium - He/Hr"],
     //["heliumOwned", 1, "Helium - Total"],
     //["helife", 1, "HeHr % / LifetimeHe"],
@@ -621,15 +545,18 @@ const graphList = [
     ["bonfires", 2, "Bonfires"],
     ["embers", 2, "Embers"],
     ["cruffys", 2, "Cruffys"],
-    //["voids", false, "Void Map History"],
-    //["coord", false, "Coordinations"],
+    ["voids", false, "Void Map History", {
+        title: "Void Map History (voids finished during the same level acquired (with RunNewVoids) are not counted/tracked)",
+        yTitle: "Number of Void Maps"
+    }],
+    ["coord", false, "Coordinations"],
     //["nullifium", false, "Nullifium Gained"],
     //["overkill", false, "OverkillCells"],
     //["zonetime", false, "Clear Time"],
     //["zonetime", false, "Cumulative Clear Time"],
-    //["mapbonus", false, "Map Bonus"],
+    ["mapbonus", false, "Map Bonus"],
     ["empower", false, "Empower"],
-].map(graph => new Graph(...graph));
+].map(graph => { let data = new Graph(...graph); return [data.selectorText, data] }));
 
 const getGameData = {
     currentTime: () => { return new Date().getTime() },
@@ -676,24 +603,21 @@ const getGameData = {
 //this.perZoneData.u1graphSelection[world] = document.getElementById('u1graphSelection').options[document.getElementById('u1graphSelection').options.selectedIndex].value
 //this.perZoneData.u2graphSelection[world] = document.getElementById('u2graphSelection').options[document.getElementById('u2graphSelection').options.selectedIndex].value
 
-const Portal = {
-    universe: getGameData.universe(),
-    totalPortals: getTotalPortals(true),
-    portalTime: getGameData.portalTime(),
-    challenge: game.global.challengeActive === 'Daily' ? dailyDate : game.global.challengeActive,
-    s3: getGameData.s3(), // would be nice to only save this in U2... 
-    perZoneData: Object.fromEntries(graphList
-        .filter((graph) => graph.universe == universe) // only save data relevant to the current universe
+function Portal() {
+    this.universe = getGameData.universe();
+    this.totalPortals = getTotalPortals(true);
+    this.portalTime = getGameData.portalTime();
+    this.challenge = game.global.challengeActive === 'Daily'
+        ? getCurrentChallengePane().split('.')[0].substr(13).slice(0, 16) // names dailies by their start date, only moderately cursed
+        : game.global.challengeActive;
+    this.s3 = getGameData.s3(); // TODO would be nice to only save this in U2... 
+    this.perZoneData = Object.fromEntries(Object.values(graphList)
+        .filter((graph) => graph.universe == this.universe || !graph.universe) // only save data relevant to the current universe
         .map(graph => [graph.dataVar, []])
-        .concat([["world", []], ["currentTime", []]])), // I love []]]))
-
-    update: function () {
+        .concat([["world", []], ["currentTime", []]]) // I love []]])
+    );
+    this.update = function () {
         const world = getGameData.world();
-        // oh no I've forgotten where this bit of code should go.  Probably in the 'init
-        if (game.global.challengeActive === 'Daily') {
-            var dailyString = getCurrentChallengePane().split('.');
-            var dailyDate = dailyString[0].substr(13).slice(0, 16);
-        }
         for (const [name, data] of Object.entries(this.perZoneData)) {
             data[world] = getGameData[name]();
         }
@@ -701,17 +625,17 @@ const Portal = {
 }
 
 
-// Here begins hell (I haven't touched this shit)
+// Here begins hell (I have barely touched this shit)
 
 var $u1Graph = document.getElementById("graphFooterLine1"),
-    u1graphList = graphList.filter((graph) => graph.universe == 1 || !graph.universe).map((graph) => graph.selectorText),
+    u1graphList = Object.values(graphList).filter((graph) => graph.universe == 1 || !graph.universe).map((graph) => graph.selectorText),
     $u1graphSel = document.createElement("select");
 for (var item in (($u1graphSel.id = "u1graphSelection"), $u1graphSel.setAttribute("style", ""), $u1graphSel.setAttribute("onchange", "drawGraph()"), u1graphList)) {
     var $opt = document.createElement("option");
     ($opt.value = u1graphList[item]), ($opt.text = u1graphList[item]), $u1graphSel.appendChild($opt);
 }
 var $u2Graph = document.getElementById("graphFooterLine1"),
-    u2graphList = graphList.filter((graph) => graph.universe == 2 || !graph.universe).map((graph) => graph.selectorText),
+    u2graphList = Object.values(graphList).filter((graph) => graph.universe == 2 || !graph.universe).map((graph) => graph.selectorText),
     $u2graphSel = document.createElement("select");
 for (var item in (($u2graphSel.id = "u2graphSelection"), $u2graphSel.setAttribute("style", ""), $u2graphSel.setAttribute("onchange", "drawGraph()"), u2graphList)) {
     var $opt = document.createElement("option");
@@ -794,19 +718,6 @@ function toggleAllGraphs() {
     for (var c, a = 0, b = 0; b < chart1.series.length; b++) (c = chart1.series[b]), c.visible && a++;
     for (var c, b = 0; b < chart1.series.length; b++) (c = chart1.series[b]), a > chart1.series.length / 2 ? c.hide() : c.show();
 }
-/*function clearData(portal,clrall) {
-    if(!portal)
-        portal = 0;
-    if (!clrall) {
-        while(allSaveData[0].totalPortals < getTotalPortals(true) - portal) {
-            allSaveData.shift();
-        }
-    } else {
-        while(allSaveData[0].totalPortals != game.global.totalPortals) {
-            allSaveData.shift();
-        }
-    }
-}*/
 
 //TODO update to new data var
 function clearData(portal, clrall = false) {
@@ -837,13 +748,14 @@ function deleteSpecific() {
     showHideUnusedGraphs();
 }
 function autoToggleGraph() {
+    // TODO 
     game.options.displayed && toggleSettingsMenu();
     var a = document.getElementById("autoSettings");
     a && "block" === a.style.display && (a.style.display = "none");
     var a = document.getElementById("autoTrimpsTabBarMenu");
     a && "block" === a.style.display && (a.style.display = "none");
     var b = document.getElementById("graphParent");
-    "block" === b.style.display ? (b.style.display = "none") : ((b.style.display = "block"), setGraph());
+    "block" === b.style.display ? (b.style.display = "none") : ((b.style.display = "block")); // , displayGraph()
 }
 function escapeATWindows() {
     var a = document.getElementById("tooltipDiv");
@@ -864,33 +776,25 @@ document.addEventListener(
     !0
 );
 
-//TODO AAAAAAAAAAA 
+
 function pushData() {
-    debug("Starting Zone " + game.global.world, "graphs");
-    var getPercent = (game.stats.heliumHour.value() / (game.global.totalHeliumEarned - (game.global.heliumLeftover + game.resources.helium.owned))) * 100;
-    var lifetime = (game.resources.helium.owned / (game.global.totalHeliumEarned - game.resources.helium.owned)) * 100;
-    var RgetPercent = (game.stats.heliumHour.value() / (game.global.totalRadonEarned - (game.global.radonLeftover + game.resources.radon.owned))) * 100;
-    var Rlifetime = (game.resources.radon.owned / (game.global.totalRadonEarned - game.resources.radon.owned)) * 100;
-
-    if (game.global.challengeActive === 'Daily') {
-        var dailyString = getCurrentChallengePane().split('.');
-        var dailyDate = dailyString[0].substr(13).slice(0, 16);
-    }
-
+    debug("Starting Zone " + getGameData.world(), "graphs");
     const portalID = `u${getGameData.universe()} p${getTotalPortals(true)}`
     if (!portalSaveData[portalID]) {
-        portalSaveData[portalID] = Object.create(Portal);
+        portalSaveData[portalID] = new Portal();
     }
     portalSaveData[portalID].update();
 
-    clearData(10);
+    //clearData(10); // TODO this value should be different now wheee
     // TODO OH GOD DON'T FORCE SAVES TO LOCALSTORAGE UNLESS DATA HAS CHANGED
+    // Alternately, could we please wrap the <change zone> function instead of running on a timer?
     safeSetItems("portalSaveData", JSON.stringify(portalSaveData));
     showHideUnusedGraphs();
 }
 
 //TODO update to new data var
 function showHideUnusedGraphs() {
+    return; // TODO TEMP DISABLE
     // Hide challenge graphs that are not in the saved data
     const graphedChallenges = [...new Set(allSaveData.map((data) => data = data.challenge))];
     const perChallengeGraphs = {
@@ -954,15 +858,17 @@ InitGraphsVars();
 function gatherInfo() {
     if (game.options.menu.pauseGame.enabled) return;
     initializeData();
+    const world = getGameData.world();
     GraphsVars.aWholeNewPortal = GraphsVars.currentPortal != getTotalPortals(true);
     if (GraphsVars.aWholeNewPortal) {
         GraphsVars.currentPortal = getTotalPortals(true);
     }
-    GraphsVars.aWholeNewWorld = GraphsVars.currentworld != game.global.world;
+    GraphsVars.aWholeNewWorld = GraphsVars.currentworld != world;
     if (GraphsVars.aWholeNewWorld) {
-        GraphsVars.currentworld = game.global.world;
-        //TODO update to new data var
-        if (allSaveData.length > 0 && allSaveData[allSaveData.length - 1].world != game.global.world) {
+        GraphsVars.currentworld = world;
+        //TODO update to new data var 
+        // the most awful short circuit, this is 100% awful and is only here because I want to take the update off a setInterval and on to a wrapper
+        if (true || allSaveData.length > 0 && allSaveData[allSaveData.length - 1].world != world) {
             pushData();
         }
         GraphsVars.OVKcellsInWorld = 0;
@@ -980,7 +886,6 @@ function gatherInfo() {
 var portalExistsArray = [];
 var portalRunArray = [];
 var portalRunIndex = 0;
-
 
 
 setInterval(gatherInfo, 100);
