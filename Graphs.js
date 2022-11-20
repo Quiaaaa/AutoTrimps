@@ -27,12 +27,12 @@ var allSaveData = [],
     graphData = [],
     tmpGraphData = JSON.parse(localStorage.getItem("allSaveData")),
     tempPortalGraphData = JSON.parse(localStorage.getItem("portalSaveData"));
-//TODO get all of this initialization shit into a function
+//TODO clean up this mess of initialization, UI, and ???
 null !== tmpGraphData && (console.log("Graphs: Found allSaveData (portal runs data). Yay!"), (allSaveData = tmpGraphData), (portalSaveData = tempPortalGraphData)), (MODULES.graphs = {}), (MODULES.graphs.useDarkAlways = !1);
 var head = document.getElementsByTagName("head")[0],
     chartscript = document.createElement("script");
 chartscript.type = "text/javascript";
-chartscript.src = "https://Zorn192.github.io/AutoTrimps/highcharts.js"; // TODO this should be relative
+chartscript.src = "https://code.highcharts.com/highcharts.js";
 head.appendChild(chartscript);
 var newItem = document.createElement("TD");
 newItem.appendChild(document.createTextNode("Graphs"))
@@ -68,7 +68,6 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
     this.yTitle = this.selectorText;
     this.formatter = null;
     this.valueSuffix = "";
-    //this.series; // TODO NOT SURE WHAT TO DO HERE
     this.xminFloor = 1;
     this.yminFloor = null;
     this.yType = "Linear";
@@ -80,12 +79,9 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
         if (Object.hasOwnProperty(this, key)) this[key] = value;
     }
 
-    // renders a graph with Highcharts
-    this.displayGraph = function () {
-        // Original signature
-        // function setGraph(title, xTitle, yTitle, valueSuffix, formatter, series, yType, xminFloor, yminFloor, additionalParams)
-        // TODO 100% sure I've fucked up something here
-        chart1 = new Highcharts.Chart({
+    // create an object to pass to Highcharts.Chart
+    this.createHighChartsObj = function () {
+        return {
             chart: {
                 renderTo: "graph",
                 zoomType: "xy",
@@ -154,28 +150,25 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
             },
             series: this.graphData,
             additionalParams: {},
-        });
+        }
     }
-
-    //
-    this.setGraphData = function () {
+    this.updateGraph = function () {
         let oldData = JSON.stringify(this.graphData)
+        let valueSuffix = this.valueSuffix;
         this.graphFunc();
         this.formatter = function () {
             var ser = this.series; // this is the most fucking confusing use of 'this' ever, this function is called by a highcharts object
             return '<span style="color:' + ser.color + '" >●</span> ' + ser.name + ": <b>" + prettify(this.y) + valueSuffix + "</b><br>";
         };
-        var additionalParams = {};
         if (oldData != JSON.stringify(this.graphData)) {
-            this.displayGraph();
+            chart1 = new Highcharts.Chart(this.createHighChartsObj());
             saveSelectedGraphs();
-
         }
         if (document.getElementById("rememberCB").checked) {
             applyRememberedSelections();
         }
     }
-    // Converts data into highCharts format, and optionally transforms it with customFunction or useAccumulator
+    // prepares data series for Highcharts, and optionally transforms it with customFunction or useAccumulator
     // TODO  customFunction and useAccumulator
     this.allPurposeGraph = function (item, extraChecks, typeCheck) {
         var currentPortal = -1;
@@ -184,13 +177,15 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
         this.graphData = [];
         for (const portal of Object.values(portalSaveData)) {
             if (!(item in portal.perZoneData)) continue;
-            if (typeCheck) { // null out data on typecheck, possibly not a great way to do this (old code continue'd past 'bad' data)
-                portal.perZoneData[item].forEach((z) => { if (typeof z != typeCheck) z = null })
+            let cleanData = [];
+            for (x of portal.perZoneData[item]) {
+                if (typeCheck && typeof x != typeCheck) x = null;
+                cleanData.push(x)
             }
             this.graphData.push({
                 name: `Portal ${portal.totalPortals}: ${portal.challenge}`,
-                data: portal.perZoneData[item],
-                universe: portal.universe
+                data: cleanData,
+                //universe: portal.universe
             })
             //TODO This is 100% not finished and I forget where I left off
             /*
@@ -226,11 +221,11 @@ function drawGraph(a, b, refresh) {
     var c = universe == 'Universe 1' ? document.getElementById("u1graphSelection") : universe == 'Universe 2' ? document.getElementById("u2graphSelection") : "Universe 1";
     if (a === undefined && b === undefined && c.value !== undefined && refresh !== undefined) {
         //setGraphData('Refresh'); // TODO AAA WHAT THE FUCK DOES REFRESH EVEN DO? 
-        graphList[c.value].setGraphData();
+        graphList[c.value].updateGraph();
     }
     a
         ? (c.selectedIndex--, 0 > c.selectedIndex && (c.selectedIndex = 0))
-        : b && c.selectedIndex != c.options.length - 1 && c.selectedIndex++, graphList[c.value].setGraphData();
+        : b && c.selectedIndex != c.options.length - 1 && c.selectedIndex++, graphList[c.value].updateGraph();
 }
 
 
@@ -886,6 +881,8 @@ function gatherInfo() {
 var portalExistsArray = [];
 var portalRunArray = [];
 var portalRunIndex = 0;
+
+
 
 
 setInterval(gatherInfo, 100);
