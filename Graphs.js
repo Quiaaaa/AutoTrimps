@@ -104,6 +104,7 @@ function init() {
         MODULES.graphs.themeChanged();
 }
 
+// 
 function Graph(dataVar, universe, selectorText, additionalParams = {}) {
     // graphTitle, customFunction, useAccumulator, xTitle, yTitle, formatter, valueSuffix, xminFloor, yminFloor, yType
     this.dataVar = dataVar
@@ -120,12 +121,12 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
     this.yminFloor = null;
     this.yType = "Linear";
     this.graphData = [];
+    this.conditional = () => { return true };
     this.graphFunc = function () {
         this.allPurposeGraph(this.dataVar, true, "number");
     }
-    //TODO 90% sure this is wrong
     for (const [key, value] of Object.entries(additionalParams)) {
-        if (Object.hasOwnProperty(this, key)) this[key] = value;
+        if (this.hasOwnProperty(key)) this[key] = value;
     }
     // create an object to pass to Highcharts.Chart
     this.createHighChartsObj = function () {
@@ -574,10 +575,14 @@ const graphList = Object.fromEntries([
     //["heliumOwned", 1, "Helium - Total"],
     //["helife", 1, "HeHr % / LifetimeHe"],
     //["helife", 1, "He % / LifetimeHe"],
-    //["fluffy", 1, "Fluffy XP"],
+    //["fluffy", 1, "Fluffy XP", {
+    //conditional: () => { return game.global.highestLevelCleared >= 300 }
+    //}],
     //["fluffy", 1, "Fluffy XP PerHour"],
     ["amals", 1, "Amalgamators"],
-    ["wonders", 1, "Wonders"],
+    ["wonders", 1, "Wonders", {
+        conditional: () => { return getGameData.challengeActive() === "Experience" }
+    }],
     //["rnhr", 2, "Radon - Rn/Hr"],
     //["rnhr", 2, "Radon - Rn/Hr Normalized"],
     //["radonOwned", 2, "Radon - Total"],
@@ -587,25 +592,37 @@ const graphList = Object.fromEntries([
     //["scruffy", 2, "Scruffy XP"],
     //["scruffy", 2, "Scruffy XP PerHour"],
     ["worshippers", 2, "Worshippers"],
-    ["bonfires", 2, "Bonfires"],
-    ["embers", 2, "Embers"],
-    ["cruffys", 2, "Cruffys"],
-    ["voids", false, "Void Map History", {
-        title: "Void Map History (voids finished during the same level acquired (with RunNewVoids) are not counted/tracked)",
-        yTitle: "Number of Void Maps"
+    ["bonfires", 2, "Bonfires", {
+        graphTitle: "Active Bonfires",
+        conditional: () => { return getGameData.challengeActive() === "Hypothermia" }
     }],
-    ["coord", false, "Coordinations"],
-    //["nullifium", false, "Nullifium Gained"],
-    //["overkill", false, "OverkillCells"],
+    ["embers", 2, "Embers", {
+        conditional: () => { return getGameData.challengeActive() === "Hypothermia" }
+    }],
+    ["cruffys", 2, "Cruffys", {
+        conditional: () => { return getGameData.challengeActive() === "Nurture" }
+    }],
+    ["voids", false, "Void Map History", {
+        graphTitle: "Void Map History (voids finished during the same level acquired are not counted/tracked)",
+        yTitle: "Number of Void Maps",
+    }],
+    ["coord", false, "Coordinations", {
+        graphTitle: "Unbought Coordinations",
+    }],
+    //["nullifium", false, "Nullifium Gained"], // BAR GRAPH
+    //["overkill", false, "Overkill Cells"],
     //["zonetime", false, "Clear Time"],
     //["zonetime", false, "Cumulative Clear Time"],
     ["mapbonus", false, "Map Bonus"],
-    ["empower", false, "Empower"],
+    ["empower", false, "Empower", {
+        conditional: () => { return getGameData.challengeActive() === "Daily" && typeof game.global.dailyChallenge.empower !== "undefined" }
+    }]
 ].map(graph => { let data = new Graph(...graph); return [data.selectorText, data] }));
 
 const getGameData = {
     currentTime: () => { return new Date().getTime() },
     world: () => { return game.global.world },
+    challengeActive: () => { return game.global.challengeActive },
     voids: () => { return game.global.totalVoidMaps },
     nullifium: () => { return recycleAllExtraHeirlooms(true) },
     coord: () => { return game.upgrades.Coordination.allowed - game.upgrades.Coordination.done },
@@ -652,12 +669,14 @@ function Portal() {
     this.universe = getGameData.universe();
     this.totalPortals = getTotalPortals(true);
     this.portalTime = getGameData.portalTime();
-    this.challenge = game.global.challengeActive === 'Daily'
+    this.challenge = getGameData.challengeActive() === 'Daily'
         ? getCurrentChallengePane().split('.')[0].substr(13).slice(0, 16) // names dailies by their start date, only moderately cursed
-        : game.global.challengeActive;
+        : getGameData.challengeActive();
     this.s3 = getGameData.s3(); // TODO would be nice to only save this in U2... 
     this.perZoneData = Object.fromEntries(Object.values(graphList)
-        .filter((graph) => graph.universe == this.universe || !graph.universe) // only save data relevant to the current universe
+        .filter((graph) =>
+            (graph.universe == this.universe || !graph.universe) // only save data relevant to the current universe
+            && graph.conditional()) // and for relevant challenges
         .map(graph => [graph.dataVar, []])
         .concat([["world", []], ["currentTime", []]]) // I love []]])
     );
