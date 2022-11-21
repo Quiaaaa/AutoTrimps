@@ -21,37 +21,88 @@ function debug(message, type, lootIcon) {
 }
 
 var MODULES = {}
-
-
-
-
-
-var head = document.getElementsByTagName("head")[0],
-    chartscript = document.createElement("script");
-chartscript.type = "text/javascript";
-chartscript.src = "https://code.highcharts.com/highcharts.js";
-head.appendChild(chartscript);
-var newItem = document.createElement("TD");
-newItem.appendChild(document.createTextNode("Graphs"))
-newItem.setAttribute("class", "btn btn-default")
-newItem.setAttribute("onclick", "autoToggleGraph(); drawGraph(undefined, undefined, true);");
-var settingbarRow = document.getElementById("settingsTable").firstElementChild.firstElementChild;
-settingbarRow.insertBefore(newItem, settingbarRow.childNodes[10]),
-    (document.getElementById("settingsRow").innerHTML += '<div id="graphParent" style="display: none; height: 600px; overflow: auto;"><div id="graph" style="margin-bottom: 10px;margin-top: 5px; height: 530px;"></div>'),
-    (document.getElementById("graphParent").innerHTML +=
-        '<div id="graphFooter" style="height: 50px;font-size: 1em;"><div id="graphFooterLine1" style="display: -webkit-flex;flex: 0.75;flex-direction: row; height:30px;"></div><div id="graphFooterLine2"></div></div>');
-var $universeFooter = document.getElementById("graphFooterLine1"),
-    universeList = [
-        "Universe 1",
-        "Universe 2",
-    ],
-    $universeSel = document.createElement("select");
-for (var item in (($universeSel.id = "universeSelection"), $universeSel.setAttribute("style", ""), $universeSel.setAttribute("onchange", "drawGraph()"), universeList)) {
-    var $opt = document.createElement("option");
-    ($opt.value = universeList[item]), ($opt.text = universeList[item]), $universeSel.appendChild($opt);
-}
-
 var chart1;
+
+// This is not a good function. It is not my function.  
+// It is all of the UI and loading of scripts that should not be littering global scope
+// TODO reduce screaming, remove some of the useless buttons, decide what new ones should be added
+function init() {
+    var head = document.getElementsByTagName("head")[0]
+    var chartscript = document.createElement("script");
+    chartscript.type = "text/javascript";
+    chartscript.src = "https://code.highcharts.com/highcharts.js";
+    head.appendChild(chartscript);
+
+    var newItem = document.createElement("TD");
+    newItem.appendChild(document.createTextNode("Graphs"))
+    newItem.setAttribute("class", "btn btn-default")
+    newItem.setAttribute("onclick", "autoToggleGraph(); drawGraph(undefined, undefined, true);");
+
+    var settingbarRow = document.getElementById("settingsTable").firstElementChild.firstElementChild;
+    settingbarRow.insertBefore(newItem, settingbarRow.childNodes[10])
+
+    document.getElementById("settingsRow").innerHTML += '<div id="graphParent" style="display: none; height: 600px; overflow: auto;"><div id="graph" style="margin-bottom: 10px;margin-top: 5px; height: 530px;"></div>'
+    document.getElementById("graphParent").innerHTML += '<div id="graphFooter" style="height: 50px;font-size: 1em;"><div id="graphFooterLine1" style="display: -webkit-flex;flex: 0.75;flex-direction: row; height:30px;"></div><div id="graphFooterLine2"></div></div>';
+
+    var $universeFooter = document.getElementById("graphFooterLine1");
+    var universeList = ["Universe 1", "Universe 2"];
+    var $universeSel = document.createElement("select");
+    for (var item in (($universeSel.id = "universeSelection"), $universeSel.setAttribute("style", ""), $universeSel.setAttribute("onchange", "drawGraph()"), universeList)) {
+        var $opt = document.createElement("option");
+        ($opt.value = universeList[item]), ($opt.text = universeList[item]), $universeSel.appendChild($opt);
+    }
+
+    var $u1Graph = document.getElementById("graphFooterLine1"),
+        u1graphList = Object.values(graphList).filter((graph) => graph.universe == 1 || !graph.universe).map((graph) => graph.selectorText),
+        $u1graphSel = document.createElement("select");
+    for (var item in (($u1graphSel.id = "u1graphSelection"), $u1graphSel.setAttribute("style", ""), $u1graphSel.setAttribute("onchange", "drawGraph()"), u1graphList)) {
+        var $opt = document.createElement("option");
+        ($opt.value = u1graphList[item]), ($opt.text = u1graphList[item]), $u1graphSel.appendChild($opt);
+    }
+    var $u2Graph = document.getElementById("graphFooterLine1"),
+        u2graphList = Object.values(graphList).filter((graph) => graph.universe == 2 || !graph.universe).map((graph) => graph.selectorText),
+        $u2graphSel = document.createElement("select");
+    for (var item in (($u2graphSel.id = "u2graphSelection"), $u2graphSel.setAttribute("style", ""), $u2graphSel.setAttribute("onchange", "drawGraph()"), u2graphList)) {
+        var $opt = document.createElement("option");
+        ($opt.value = u2graphList[item]), ($opt.text = u2graphList[item]), $u2graphSel.appendChild($opt);
+    }
+    $universeFooter.appendChild($universeSel),
+        $universeFooter.appendChild($u1graphSel),
+        $universeFooter.appendChild($u2graphSel),
+        ($universeFooter.innerHTML +=
+            `<div><button onclick="drawGraph(true,false)" style="margin-left:0.5em; width:2em;">\u2191</button></div>
+        <div><button onclick="drawGraph(false,true)" style="margin-left:0.5em; width:2em;">\u2193</button></div>
+        <div><button onclick="drawGraph()" style="margin-left:0.5em;">Refresh</button></div>
+        <div style="flex:0 100 5%;"></div><div><input type="checkbox" id="clrChkbox" onclick="toggleClearButton();"></div>
+        <div style="margin-left: 0.5vw;"><button id="clrAllDataBtn" onclick="clearData(null,true); drawGraph();" class="btn" disabled="" style="flex:auto; padding: 2px 6px;border: 1px solid white;">Clear All Previous Data</button></div>
+        <div style="flex:0 100 5%;"></div><div style="flex:0 2 3.5vw;"><input style="width:100%;min-width: 40px;" id="deleteSpecificTextBox"></div>
+        <div style="flex:auto; margin-left: 0.5vw;"><button onclick="deleteSpecific(); drawGraph();">Delete Specific Portal</button></div>
+        <div style="flex:0 100 5%;"></div><div style="flex:auto;"><button  onclick="GraphsImportExportTooltip(\'ExportGraphs\', null, \'update\')" onmouseover=\'tooltip("Tips", "customText", event, "Export Graph Database will make a backup of all the graph data to a text string.<b>DISCLAIMER:</b> Takes quite a long time to generate.")\' onmouseout=\'tooltip("hide")\'>Export your Graph Database</button></div><div style="float:right; margin-right: 0.5vw;"><button onclick="addGraphNoteLabel()">Add Note/Label</button></div><div style="float:right; margin-right: 0.5vw;"><button onclick="toggleSpecificGraphs()">Invert Selection</button></div><div style="float:right; margin-right: 1vw;"><button onclick="toggleAllGraphs()">All Off/On</button></div>`),
+        (document.getElementById("graphFooterLine2").innerHTML +=
+            '<span style="float: left;" onmouseover=\'tooltip("Tips", "customText", event, "You can zoom by dragging a box around an area. You can turn portals off by clicking them on the legend. Quickly view the last portal by clicking it off, then Invert Selection. Or by clicking All Off, then clicking the portal on. To delete a portal, Type its portal number in the box and press Delete Specific. Using negative numbers in the Delete Specific box will KEEP that many portals (starting counting backwards from the current one), ie: if you have Portals 1000-1015, typing -10 will keep 1005-1015. There is a browser data storage limitation of 10MB, so do not exceed 20 portals-worth of data.")\' onmouseout=\'tooltip("hide")\'>Tips: Hover for usage tips.</span><input style="height: 20px; float: right; margin-right: 0.5vw;" type="checkbox" id="rememberCB"><span style="float: right; margin-right: 0.5vw;">Try to Remember Which Portals are Selected when switching between Graphs:</span><input onclick="toggleDarkGraphs()" style="height: 20px; float: right; margin-right: 0.5vw;" type="checkbox" id="blackCB"><span style="float: right; margin-right: 0.5vw;">Black Graphs:</span>');
+
+
+    (MODULES.graphs.themeChanged = function () {
+        if (game && game.options.menu.darkTheme.enabled != lastTheme) {
+            function f(h) {
+                h.style.color = 2 == game.options.menu.darkTheme.enabled ? "" : "black";
+            }
+            function g(h) {
+                if ("graphSelection" == h.id) return void (2 != game.options.menu.darkTheme.enabled && (h.style.color = "black"));
+            }
+            toggleDarkGraphs();
+            var c = document.getElementsByTagName("input"),
+                d = document.getElementsByTagName("select"),
+                e = document.getElementById("graphFooterLine1").children;
+            for (let h of c) f(h);
+            for (let h of d) f(h);
+            for (let h of e) f(h);
+            for (let h of e) g(h);
+        }
+        game && (lastTheme = game.options.menu.darkTheme.enabled);
+    }),
+        MODULES.graphs.themeChanged();
+}
 
 function Graph(dataVar, universe, selectorText, additionalParams = {}) {
     // graphTitle, customFunction, useAccumulator, xTitle, yTitle, formatter, valueSuffix, xminFloor, yminFloor, yType
@@ -76,7 +127,6 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
     for (const [key, value] of Object.entries(additionalParams)) {
         if (Object.hasOwnProperty(this, key)) this[key] = value;
     }
-
     // create an object to pass to Highcharts.Chart
     this.createHighChartsObj = function () {
         return {
@@ -204,8 +254,7 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
     }
 }
 
-
-//TODO get all this working with new graphs structure woooo
+//TODO While technically functional, 'refresh' does not exist anymore, and I have no idea what a and b are
 function drawGraph(a, b, refresh) {
     var universe = document.getElementById('universeSelection').options[document.getElementById('universeSelection').options.selectedIndex].value;
     if (universe == 'Universe 1') {
@@ -216,9 +265,10 @@ function drawGraph(a, b, refresh) {
         document.getElementById('u1graphSelection').style.display = 'none'
         document.getElementById('u2graphSelection').style.display = ''
     }
-    var c = universe == 'Universe 1' ? document.getElementById("u1graphSelection") : universe == 'Universe 2' ? document.getElementById("u2graphSelection") : "Universe 1";
+    var c = universe == 'Universe 1'
+        ? document.getElementById("u1graphSelection")
+        : universe == 'Universe 2' ? document.getElementById("u2graphSelection") : "Universe 1";
     if (a === undefined && b === undefined && c.value !== undefined && refresh !== undefined) {
-        //setGraphData('Refresh'); // TODO AAA WHAT THE FUCK DOES REFRESH EVEN DO? 
         graphList[c.value].updateGraph();
     }
     a
@@ -619,40 +669,11 @@ function Portal() {
     }
 }
 
-
-// Here begins hell (I have barely touched this shit)
-
-var $u1Graph = document.getElementById("graphFooterLine1"),
-    u1graphList = Object.values(graphList).filter((graph) => graph.universe == 1 || !graph.universe).map((graph) => graph.selectorText),
-    $u1graphSel = document.createElement("select");
-for (var item in (($u1graphSel.id = "u1graphSelection"), $u1graphSel.setAttribute("style", ""), $u1graphSel.setAttribute("onchange", "drawGraph()"), u1graphList)) {
-    var $opt = document.createElement("option");
-    ($opt.value = u1graphList[item]), ($opt.text = u1graphList[item]), $u1graphSel.appendChild($opt);
-}
-var $u2Graph = document.getElementById("graphFooterLine1"),
-    u2graphList = Object.values(graphList).filter((graph) => graph.universe == 2 || !graph.universe).map((graph) => graph.selectorText),
-    $u2graphSel = document.createElement("select");
-for (var item in (($u2graphSel.id = "u2graphSelection"), $u2graphSel.setAttribute("style", ""), $u2graphSel.setAttribute("onchange", "drawGraph()"), u2graphList)) {
-    var $opt = document.createElement("option");
-    ($opt.value = u2graphList[item]), ($opt.text = u2graphList[item]), $u2graphSel.appendChild($opt);
-}
-$universeFooter.appendChild($universeSel),
-    $universeFooter.appendChild($u1graphSel),
-    $universeFooter.appendChild($u2graphSel),
-    ($universeFooter.innerHTML +=
-        `<div><button onclick="drawGraph(true,false)" style="margin-left:0.5em; width:2em;">\u2191</button></div>
-        <div><button onclick="drawGraph(false,true)" style="margin-left:0.5em; width:2em;">\u2193</button></div>
-        <div><button onclick="drawGraph()" style="margin-left:0.5em;">Refresh</button></div>
-        <div style="flex:0 100 5%;"></div><div><input type="checkbox" id="clrChkbox" onclick="toggleClearButton();"></div>
-        <div style="margin-left: 0.5vw;"><button id="clrAllDataBtn" onclick="clearData(null,true); drawGraph();" class="btn" disabled="" style="flex:auto; padding: 2px 6px;border: 1px solid white;">Clear All Previous Data</button></div>
-        <div style="flex:0 100 5%;"></div><div style="flex:0 2 3.5vw;"><input style="width:100%;min-width: 40px;" id="deleteSpecificTextBox"></div>
-        <div style="flex:auto; margin-left: 0.5vw;"><button onclick="deleteSpecific(); drawGraph();">Delete Specific Portal</button></div>
-        <div style="flex:0 100 5%;"></div><div style="flex:auto;"><button  onclick="GraphsImportExportTooltip(\'ExportGraphs\', null, \'update\')" onmouseover=\'tooltip("Tips", "customText", event, "Export Graph Database will make a backup of all the graph data to a text string.<b>DISCLAIMER:</b> Takes quite a long time to generate.")\' onmouseout=\'tooltip("hide")\'>Export your Graph Database</button></div><div style="float:right; margin-right: 0.5vw;"><button onclick="addGraphNoteLabel()">Add Note/Label</button></div><div style="float:right; margin-right: 0.5vw;"><button onclick="toggleSpecificGraphs()">Invert Selection</button></div><div style="float:right; margin-right: 1vw;"><button onclick="toggleAllGraphs()">All Off/On</button></div>`),
-    (document.getElementById("graphFooterLine2").innerHTML +=
-        '<span style="float: left;" onmouseover=\'tooltip("Tips", "customText", event, "You can zoom by dragging a box around an area. You can turn portals off by clicking them on the legend. Quickly view the last portal by clicking it off, then Invert Selection. Or by clicking All Off, then clicking the portal on. To delete a portal, Type its portal number in the box and press Delete Specific. Using negative numbers in the Delete Specific box will KEEP that many portals (starting counting backwards from the current one), ie: if you have Portals 1000-1015, typing -10 will keep 1005-1015. There is a browser data storage limitation of 10MB, so do not exceed 20 portals-worth of data.")\' onmouseout=\'tooltip("hide")\'>Tips: Hover for usage tips.</span><input style="height: 20px; float: right; margin-right: 0.5vw;" type="checkbox" id="rememberCB"><span style="float: right; margin-right: 0.5vw;">Try to Remember Which Portals are Selected when switching between Graphs:</span><input onclick="toggleDarkGraphs()" style="height: 20px; float: right; margin-right: 0.5vw;" type="checkbox" id="blackCB"><span style="float: right; margin-right: 0.5vw;">Black Graphs:</span>');
+// Here begins old code
 function toggleClearButton() {
     document.getElementById("clrAllDataBtn").disabled = !document.getElementById("clrChkbox").checked;
 }
+
 function addDarkGraphs() {
     var a = document.getElementById("dark-graph.css");
     if (!a) {
@@ -664,6 +685,7 @@ function removeDarkGraphs() {
     var a = document.getElementById("dark-graph.css");
     a && (document.head.removeChild(a), debug("Removing dark-graph.css file", "graphs"));
 }
+
 function toggleDarkGraphs() {
     if (game) {
         var c = document.getElementById("dark-graph.css"),
@@ -674,9 +696,6 @@ function toggleDarkGraphs() {
     }
 }
 
-function appendGraphs() {
-    drawGraph();
-}
 var rememberSelectedVisible = [];
 function saveSelectedGraphs() {
     rememberSelectedVisible = [];
@@ -755,7 +774,7 @@ document.addEventListener(
     !0
 );
 
-
+// Up to date (ish)
 function pushData() {
     debug("Starting Zone " + getGameData.world(), "graphs");
     const portalID = `u${getGameData.universe()} p${getTotalPortals(true)}`
@@ -801,10 +820,9 @@ function showHideUnusedGraphs() {
             const style = [...new Set(allSaveData.map((graphs) => graphs = graphs[dataName]))].length == 1 ? "none" : "";
             document.querySelector(`#${universe}graphSelection [value="${graphName}"]`).style.display = style;
         }
-
     }
 }
-//TODO test
+
 function initializeData() {
     if (null === portalSaveData) portalSaveData = {};
     if (0 === portalSaveData.length) pushData();
@@ -837,6 +855,7 @@ function InitGraphsVars() {
     */
 };
 
+// TODO unravel mess of GraphVars
 function gatherInfo() {
     if (game.options.menu.pauseGame.enabled) return;
     initializeData();
@@ -848,11 +867,9 @@ function gatherInfo() {
     GraphsVars.aWholeNewWorld = GraphsVars.currentworld != world;
     if (GraphsVars.aWholeNewWorld) {
         GraphsVars.currentworld = world;
-        //TODO update to new data var 
-        // the most awful short circuit, this is 100% awful and is only here because I want to take the update off a setInterval and on to a wrapper
+        // TODO the most awful short circuit, this is 100% awful and is only here because I want to take the update off a setInterval and on to a wrapper
         pushData();
         //if (allSaveData.length > 0 && allSaveData[allSaveData.length - 1].world != world) {
-
         //}
         GraphsVars.OVKcellsInWorld = 0;
         GraphsVars.ZoneStartTime = 0;
@@ -865,7 +882,6 @@ function gatherInfo() {
     GraphsVars.ZoneStartTime = new Date().getTime() - game.global.zoneStarted;
     GraphsVars.MapBonus = game.global.mapBonus;
 }
-
 
 function loadGraphData() {
     loadedData = JSON.parse(localStorage.getItem("portalSaveData"));
@@ -885,30 +901,7 @@ function loadGraphData() {
 
 var portalSaveData = {}
 loadGraphData();
+init()
 InitGraphsVars();
-
-
 var lastTheme = -1;
-(MODULES.graphs.themeChanged = function () {
-    if (game && game.options.menu.darkTheme.enabled != lastTheme) {
-        function f(h) {
-            h.style.color = 2 == game.options.menu.darkTheme.enabled ? "" : "black";
-        }
-        function g(h) {
-            if ("graphSelection" == h.id) return void (2 != game.options.menu.darkTheme.enabled && (h.style.color = "black"));
-        }
-        toggleDarkGraphs();
-        var c = document.getElementsByTagName("input"),
-            d = document.getElementsByTagName("select"),
-            e = document.getElementById("graphFooterLine1").children;
-        for (let h of c) f(h);
-        for (let h of d) f(h);
-        for (let h of e) f(h);
-        for (let h of e) g(h);
-    }
-    game && (lastTheme = game.options.menu.darkTheme.enabled);
-}),
-    MODULES.graphs.themeChanged();
-
-
 setInterval(gatherInfo, 100);
