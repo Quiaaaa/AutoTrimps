@@ -1,4 +1,5 @@
-var basepath = ''
+var basepath = 'AutoTrimps/' // LOCAL ONLY
+
 function safeSetItems(name, data) {
     try {
         localStorage.setItem(name, data);
@@ -22,13 +23,9 @@ function debug(message, type, lootIcon) {
 var MODULES = {}
 
 
-var portalSaveData = {}
-var allSaveData = [],
-    graphData = [],
-    tmpGraphData = JSON.parse(localStorage.getItem("allSaveData")),
-    tempPortalGraphData = JSON.parse(localStorage.getItem("portalSaveData"));
-//TODO clean up this mess of initialization, UI, and ???
-null !== tmpGraphData && (console.log("Graphs: Found allSaveData (portal runs data). Yay!"), (allSaveData = tmpGraphData), (portalSaveData = tempPortalGraphData)), (MODULES.graphs = {}), (MODULES.graphs.useDarkAlways = !1);
+
+
+
 var head = document.getElementsByTagName("head")[0],
     chartscript = document.createElement("script");
 chartscript.type = "text/javascript";
@@ -75,6 +72,7 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
     this.graphFunc = function () {
         this.allPurposeGraph(this.dataVar, true, "number");
     }
+    //TODO 90% sure this is wrong
     for (const [key, value] of Object.entries(additionalParams)) {
         if (Object.hasOwnProperty(this, key)) this[key] = value;
     }
@@ -230,6 +228,7 @@ function drawGraph(a, b, refresh) {
 
 
 // TODO all of the data in the switch should be in graphList instead, as soon as I decide how to handle accumulators and custom functions
+/*
 function setGraphData(graph) {
     switch (graph) {
         case "Refresh":
@@ -515,6 +514,7 @@ function setGraphData(graph) {
             break;
     }
 }
+*/
 
 // Graph(dataVar, universe, selectorText, additionalParams) {
 // graphTitle, customFunction, useAccumulator, xTitle, yTitle, formatter, valueSuffix, xminFloor, yminFloor, yType
@@ -673,27 +673,6 @@ function toggleDarkGraphs() {
             : c && (1 == game.options.menu.darkTheme.enabled || 3 == game.options.menu.darkTheme.enabled || !d) && removeDarkGraphs();
     }
 }
-var lastTheme = -1;
-(MODULES.graphs.themeChanged = function () {
-    if (game && game.options.menu.darkTheme.enabled != lastTheme) {
-        function f(h) {
-            h.style.color = 2 == game.options.menu.darkTheme.enabled ? "" : "black";
-        }
-        function g(h) {
-            if ("graphSelection" == h.id) return void (2 != game.options.menu.darkTheme.enabled && (h.style.color = "black"));
-        }
-        toggleDarkGraphs();
-        var c = document.getElementsByTagName("input"),
-            d = document.getElementsByTagName("select"),
-            e = document.getElementById("graphFooterLine1").children;
-        for (let h of c) f(h);
-        for (let h of d) f(h);
-        for (let h of e) f(h);
-        for (let h of e) g(h);
-    }
-    game && (lastTheme = game.options.menu.darkTheme.enabled);
-}),
-    MODULES.graphs.themeChanged();
 
 function appendGraphs() {
     drawGraph();
@@ -714,34 +693,39 @@ function toggleAllGraphs() {
     for (var c, b = 0; b < chart1.series.length; b++) (c = chart1.series[b]), a > chart1.series.length / 2 ? c.hide() : c.show();
 }
 
-//TODO update to new data var
-function clearData(portal, clrall = false) {
+//Up to date
+function clearData(keepN, clrall = false) {
+    var currentPortalNumber = getTotalPortals(true);
+    var currentUniverse = getGameData.universe();
     if (clrall) {
-        var currentPortalNumber = getTotalPortals(true);
-        while (allSaveData[0].totalPortals != currentPortalNumber) {
-            allSaveData.shift();
-        }
-    } else {
-        var keepSaveDataIndex = allSaveData.length - 1;
-        for (var i = 0; i <= portal; i++) {
-            keepSaveDataIndex -= allSaveData[keepSaveDataIndex].world;
-            if (keepSaveDataIndex <= 0) {
-                return;
+        for (const [portalID, portalData] of Object.entries(portalSaveData)) {
+            if (portalData.totalPortals != currentPortalNumber) {
+                delete portalSaveData[portalID];
             }
         }
-
-        allSaveData.splice(0, keepSaveDataIndex + 1);
+    } else {
+        for (const [portalID, portalData] of Object.entries(portalSaveData)) {
+            if (portalData.totalPortals < currentPortalNumber - keepN) {
+                delete portalSaveData[portalID];
+            }
+        }
     }
     showHideUnusedGraphs();
 }
-//TODO update to new data var
+
+//Up to date
 function deleteSpecific() {
-    var a = document.getElementById("deleteSpecificTextBox").value;
-    if ("" != a)
-        if (0 > parseInt(a)) clearData(Math.abs(a));
-        else for (var b = allSaveData.length - 1; 0 <= b; b--) allSaveData[b].totalPortals == a && allSaveData.splice(b, 1);
+    var portalNum = document.getElementById("deleteSpecificTextBox").value;
+    if ("" != portalNum)
+        if (0 > parseInt(portalNum)) clearData(Math.abs(portalNum));
+        else {
+            for (const [portalID, portalData] of Object.entries(portalSaveData)) {
+                if (portalData.totalPortals === portalNum) delete portalSaveData[portalID];
+            }
+        }
     showHideUnusedGraphs();
 }
+
 function autoToggleGraph() {
     // TODO 
     game.options.displayed && toggleSettingsMenu();
@@ -779,7 +763,6 @@ function pushData() {
         portalSaveData[portalID] = new Portal();
     }
     portalSaveData[portalID].update();
-
     //clearData(10); // TODO this value should be different now wheee
     // TODO OH GOD DON'T FORCE SAVES TO LOCALSTORAGE UNLESS DATA HAS CHANGED
     // Alternately, could we please wrap the <change zone> function instead of running on a timer?
@@ -821,23 +804,27 @@ function showHideUnusedGraphs() {
 
     }
 }
-//TODO update to new data var
+//TODO test
 function initializeData() {
-    null === allSaveData && (allSaveData = []), 0 === allSaveData.length && pushData();
+    if (null === portalSaveData) portalSaveData = {};
+    if (0 === portalSaveData.length) pushData();
 }
+
+//TODO figure out why and where these are needed
 var GraphsVars = {};
 function InitGraphsVars() {
-    (GraphsVars.currentPortal = 0),
-        (GraphsVars.OVKcellsInWorld = 0),
-        (GraphsVars.lastOVKcellsInWorld = 0),
-        (GraphsVars.currentworld = 0),
-        (GraphsVars.lastrunworld = 0),
-        (GraphsVars.aWholeNewWorld = !1),
-        (GraphsVars.lastZoneStartTime = 0),
-        (GraphsVars.ZoneStartTime = 0),
-        (GraphsVars.MapBonus = 0),
-        (GraphsVars.aWholeNewPortal = 0),
-        (GraphsVars.currentPortal = 0)
+    GraphsVars.currentPortal = 0;
+    GraphsVars.OVKcellsInWorld = 0;
+    GraphsVars.lastOVKcellsInWorld = 0;
+    GraphsVars.currentworld = 0;
+    GraphsVars.lastrunworld = 0;
+    GraphsVars.aWholeNewWorld = !1;
+    GraphsVars.lastZoneStartTime = 0;
+    GraphsVars.ZoneStartTime = 0;
+    GraphsVars.MapBonus = 0;
+    GraphsVars.aWholeNewPortal = 0;
+    GraphsVars.currentPortal = 0;
+    /*
     if (allSaveData.length > 0) {
         // TODO are these three vars seriously saved on every single zone just to keep them in memory?  Put them in their own settings in localstorage ffs
         if (allSaveData[allSaveData.length - 1].universeSelection !== undefined)
@@ -847,8 +834,8 @@ function InitGraphsVars() {
         if (allSaveData[allSaveData.length - 1].u2graphSelection !== undefined)
             document.getElementById('u2graphSelection').value = allSaveData[allSaveData.length - 1].u2graphSelection
     }
+    */
 };
-InitGraphsVars();
 
 function gatherInfo() {
     if (game.options.menu.pauseGame.enabled) return;
@@ -863,9 +850,10 @@ function gatherInfo() {
         GraphsVars.currentworld = world;
         //TODO update to new data var 
         // the most awful short circuit, this is 100% awful and is only here because I want to take the update off a setInterval and on to a wrapper
-        if (true || allSaveData.length > 0 && allSaveData[allSaveData.length - 1].world != world) {
-            pushData();
-        }
+        pushData();
+        //if (allSaveData.length > 0 && allSaveData[allSaveData.length - 1].world != world) {
+
+        //}
         GraphsVars.OVKcellsInWorld = 0;
         GraphsVars.ZoneStartTime = 0;
         GraphsVars.MapBonus = 0;
@@ -878,11 +866,49 @@ function gatherInfo() {
     GraphsVars.MapBonus = game.global.mapBonus;
 }
 
-var portalExistsArray = [];
-var portalRunArray = [];
-var portalRunIndex = 0;
+
+function loadGraphData() {
+    loadedData = JSON.parse(localStorage.getItem("portalSaveData"));
+    if (loadedData !== null) {
+        console.log("Graphs: Found portalSaveData")
+        for (const [portalID, portalData] of Object.entries(loadedData)) {
+            portalSaveData[portalID] = new Portal();
+            // this seems awkward? 
+            for (const [k, v] of Object.entries(portalData)) {
+                portalSaveData[portalID][k] = v;
+            }
+        }
+    }
+    MODULES.graphs = {}
+    MODULES.graphs.useDarkAlways = false
+}
+
+var portalSaveData = {}
+loadGraphData();
+InitGraphsVars();
 
 
+var lastTheme = -1;
+(MODULES.graphs.themeChanged = function () {
+    if (game && game.options.menu.darkTheme.enabled != lastTheme) {
+        function f(h) {
+            h.style.color = 2 == game.options.menu.darkTheme.enabled ? "" : "black";
+        }
+        function g(h) {
+            if ("graphSelection" == h.id) return void (2 != game.options.menu.darkTheme.enabled && (h.style.color = "black"));
+        }
+        toggleDarkGraphs();
+        var c = document.getElementsByTagName("input"),
+            d = document.getElementsByTagName("select"),
+            e = document.getElementById("graphFooterLine1").children;
+        for (let h of c) f(h);
+        for (let h of d) f(h);
+        for (let h of e) f(h);
+        for (let h of e) g(h);
+    }
+    game && (lastTheme = game.options.menu.darkTheme.enabled);
+}),
+    MODULES.graphs.themeChanged();
 
 
 setInterval(gatherInfo, 100);
