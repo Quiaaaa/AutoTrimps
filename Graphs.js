@@ -13,14 +13,15 @@ function safeSetItems(name, data) {
 
 var enableDebug = false;
 function debug(message, type, lootIcon) {
-    var output = true;
-    if (output) {
-        if (enableDebug)
-            console.debug(0 + ' ' + message);
-    }
+    if (enableDebug)
+        console.debug(0 + ' ' + message);
 }
 
 var MODULES = {}
+
+// Above code should be in GraphsOnly.js, is here only only for ease of local testing
+var GRAPHSETTINGS = {}
+
 var chart1;
 
 // This is not a good function. It is not my function.  
@@ -41,48 +42,75 @@ function init() {
     var settingbarRow = document.getElementById("settingsTable").firstElementChild.firstElementChild;
     settingbarRow.insertBefore(newItem, settingbarRow.childNodes[10])
 
-    document.getElementById("settingsRow").innerHTML += '<div id="graphParent" style="display: none; height: 600px; overflow: auto;"><div id="graph" style="margin-bottom: 10px;margin-top: 5px; height: 530px;"></div>'
-    document.getElementById("graphParent").innerHTML += '<div id="graphFooter" style="height: 50px;font-size: 1em;"><div id="graphFooterLine1" style="display: -webkit-flex;flex: 0.75;flex-direction: row; height:30px;"></div><div id="graphFooterLine2"></div></div>';
+    document.getElementById("settingsRow").innerHTML += `
+        <div id="graphParent" style="display: none; height: 600px; overflow: auto;">
+        <div id="graph" style="margin-bottom: 10px;margin-top: 5px; height: 530px;"></div>`;
+    document.getElementById("graphParent").innerHTML += `
+        <div id="graphFooter" style="height: 50px;font-size: 1em;">
+        <div id="graphFooterLine1" style="display: -webkit-flex;flex: 0.75;flex-direction: row; height:30px;"></div>
+        <div id="graphFooterLine2"></div></div>`;
 
-    var $universeFooter = document.getElementById("graphFooterLine1");
+    var universeFooter = document.getElementById("graphFooterLine1");
     var universeList = ["Universe 1", "Universe 2"];
-    var $universeSel = document.createElement("select");
-    for (var item in (($universeSel.id = "universeSelection"), $universeSel.setAttribute("style", ""), $universeSel.setAttribute("onchange", "drawGraph()"), universeList)) {
-        var $opt = document.createElement("option");
-        ($opt.value = universeList[item]), ($opt.text = universeList[item]), $universeSel.appendChild($opt);
+    var universeSel = document.createElement("select");
+    universeSel.id = "universeSelection";
+    universeSel.setAttribute("style", "");
+    universeSel.setAttribute("onchange", "drawGraph()");
+    for (var item in universeList) {
+        var opt = document.createElement("option");
+        opt.value = universeList[item];
+        opt.text = universeList[item];
+        universeSel.appendChild(opt);
     }
 
-    var $u1Graph = document.getElementById("graphFooterLine1"),
-        u1graphList = Object.values(graphList).filter((graph) => graph.universe == 1 || !graph.universe).map((graph) => graph.selectorText),
-        $u1graphSel = document.createElement("select");
-    for (var item in (($u1graphSel.id = "u1graphSelection"), $u1graphSel.setAttribute("style", ""), $u1graphSel.setAttribute("onchange", "drawGraph()"), u1graphList)) {
-        var $opt = document.createElement("option");
-        ($opt.value = u1graphList[item]), ($opt.text = u1graphList[item]), $u1graphSel.appendChild($opt);
+    var u1graphList = Object.values(graphList)
+        .filter((graph) => graph.universe == 1 || !graph.universe)
+        .map((graph) => graph.selectorText)
+    var u1graphSel = document.createElement("select");
+    u1graphSel.id = "u1graphSelection"
+    u1graphSel.setAttribute("style", "")
+    u1graphSel.setAttribute("onchange", "drawGraph()");
+    for (var item in u1graphList) {
+        var opt = document.createElement("option");
+        opt.value = u1graphList[item]
+        opt.text = u1graphList[item]
+        u1graphSel.appendChild(opt);
     }
-    var $u2Graph = document.getElementById("graphFooterLine1"),
-        u2graphList = Object.values(graphList).filter((graph) => graph.universe == 2 || !graph.universe).map((graph) => graph.selectorText),
-        $u2graphSel = document.createElement("select");
-    for (var item in (($u2graphSel.id = "u2graphSelection"), $u2graphSel.setAttribute("style", ""), $u2graphSel.setAttribute("onchange", "drawGraph()"), u2graphList)) {
-        var $opt = document.createElement("option");
-        ($opt.value = u2graphList[item]), ($opt.text = u2graphList[item]), $u2graphSel.appendChild($opt);
+
+    var u2graphList = Object.values(graphList)
+        .filter((graph) => graph.universe == 2 || !graph.universe)
+        .map((graph) => graph.selectorText)
+    var u2graphSel = document.createElement("select");
+    u2graphSel.id = "u2graphSelection";
+    u2graphSel.setAttribute("style", "");
+    u2graphSel.setAttribute("onchange", "drawGraph()");
+    for (var item in u2graphList) {
+        var opt = document.createElement("option");
+        opt.value = u2graphList[item]
+        opt.text = u2graphList[item]
+        u2graphSel.appendChild(opt);
     }
-    $universeFooter.appendChild($universeSel),
-        $universeFooter.appendChild($u1graphSel),
-        $universeFooter.appendChild($u2graphSel),
-        ($universeFooter.innerHTML +=
-            `<div><button onclick="drawGraph(true,false)" style="margin-left:0.5em; width:2em;">\u2191</button></div>
-        <div><button onclick="drawGraph(false,true)" style="margin-left:0.5em; width:2em;">\u2193</button></div>
+    universeFooter.appendChild(universeSel)
+    universeFooter.appendChild(u1graphSel)
+    universeFooter.appendChild(u2graphSel)
+    universeFooter.innerHTML += `
         <div><button onclick="drawGraph()" style="margin-left:0.5em;">Refresh</button></div>
         <div style="flex:0 100 5%;"></div><div><input type="checkbox" id="clrChkbox" onclick="toggleClearButton();"></div>
         <div style="margin-left: 0.5vw;"><button id="clrAllDataBtn" onclick="clearData(null,true); drawGraph();" class="btn" disabled="" style="flex:auto; padding: 2px 6px;border: 1px solid white;">Clear All Previous Data</button></div>
         <div style="flex:0 100 5%;"></div><div style="flex:0 2 3.5vw;"><input style="width:100%;min-width: 40px;" id="deleteSpecificTextBox"></div>
         <div style="flex:auto; margin-left: 0.5vw;"><button onclick="deleteSpecific(); drawGraph();">Delete Specific Portal</button></div>
-        <div style="flex:0 100 5%;"></div><div style="flex:auto;"><button  onclick="GraphsImportExportTooltip(\'ExportGraphs\', null, \'update\')" onmouseover=\'tooltip("Tips", "customText", event, "Export Graph Database will make a backup of all the graph data to a text string.<b>DISCLAIMER:</b> Takes quite a long time to generate.")\' onmouseout=\'tooltip("hide")\'>Export your Graph Database</button></div><div style="float:right; margin-right: 0.5vw;"><button onclick="addGraphNoteLabel()">Add Note/Label</button></div><div style="float:right; margin-right: 0.5vw;"><button onclick="toggleSpecificGraphs()">Invert Selection</button></div><div style="float:right; margin-right: 1vw;"><button onclick="toggleAllGraphs()">All Off/On</button></div>`),
-        (document.getElementById("graphFooterLine2").innerHTML +=
-            '<span style="float: left;" onmouseover=\'tooltip("Tips", "customText", event, "You can zoom by dragging a box around an area. You can turn portals off by clicking them on the legend. Quickly view the last portal by clicking it off, then Invert Selection. Or by clicking All Off, then clicking the portal on. To delete a portal, Type its portal number in the box and press Delete Specific. Using negative numbers in the Delete Specific box will KEEP that many portals (starting counting backwards from the current one), ie: if you have Portals 1000-1015, typing -10 will keep 1005-1015. There is a browser data storage limitation of 10MB, so do not exceed 20 portals-worth of data.")\' onmouseout=\'tooltip("hide")\'>Tips: Hover for usage tips.</span><input style="height: 20px; float: right; margin-right: 0.5vw;" type="checkbox" id="rememberCB"><span style="float: right; margin-right: 0.5vw;">Try to Remember Which Portals are Selected when switching between Graphs:</span><input onclick="toggleDarkGraphs()" style="height: 20px; float: right; margin-right: 0.5vw;" type="checkbox" id="blackCB"><span style="float: right; margin-right: 0.5vw;">Black Graphs:</span>');
+        <div style="float:right; margin-right: 0.5vw;"><button onclick="toggleSpecificGraphs()">Invert Selection</button></div>
+        <div style="float:right; margin-right: 1vw;"><button onclick="toggleAllGraphs()">All Off/On</button></div>`
+
+    document.getElementById("graphFooterLine2").innerHTML += `
+        <span style="float: left;" onmouseover=\'tooltip("Tips", "customText", event, "You can zoom by dragging a box around an area. You can turn portals off by clicking them on the legend. Quickly view the last portal by clicking it off, then Invert Selection. Or by clicking All Off, then clicking the portal on. To delete a portal, Type its portal number in the box and press Delete Specific. Using negative numbers in the Delete Specific box will KEEP that many portals (starting counting backwards from the current one), ie: if you have Portals 1000-1015, typing -10 will keep 1005-1015. There is a browser data storage limitation of 10MB, so do not exceed 20 portals-worth of data.")\' onmouseout=\'tooltip("hide")\'>Tips: Hover for usage tips.</span>
+        <input style="height: 20px; float: right; margin-right: 0.5vw;" type="checkbox" id="rememberCB">
+        <span style="float: right; margin-right: 0.5vw;">Try to Remember Which Portals are Selected when switching between Graphs:</span>
+        <input onclick="toggleDarkGraphs()" style="height: 20px; float: right; margin-right: 0.5vw;" type="checkbox" id="blackCB">
+        <span style="float: right; margin-right: 0.5vw;">Black Graphs:</span>`;
 
 
-    (MODULES.graphs.themeChanged = function () {
+    MODULES.graphs.themeChanged = function () {
         if (game && game.options.menu.darkTheme.enabled != lastTheme) {
             function f(h) {
                 h.style.color = 2 == game.options.menu.darkTheme.enabled ? "" : "black";
@@ -100,8 +128,8 @@ function init() {
             for (let h of e) g(h);
         }
         game && (lastTheme = game.options.menu.darkTheme.enabled);
-    }),
-        MODULES.graphs.themeChanged();
+    }
+    MODULES.graphs.themeChanged();
 }
 
 // 
@@ -202,17 +230,16 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
         }
     }
     this.updateGraph = function () {
-        let oldData = JSON.stringify(this.graphData)
+        //let oldData = JSON.stringify(this.graphData)
         let valueSuffix = this.valueSuffix;
         this.graphFunc();
         this.formatter = function () {
             var ser = this.series; // this is the most fucking confusing use of 'this' ever, this function is called by a highcharts object
             return '<span style="color:' + ser.color + '" >●</span> ' + ser.name + ": <b>" + prettify(this.y) + valueSuffix + "</b><br>";
         };
-        if (oldData != JSON.stringify(this.graphData)) {
-            chart1 = new Highcharts.Chart(this.createHighChartsObj());
-            saveSelectedGraphs();
-        }
+        chart1 = new Highcharts.Chart(this.createHighChartsObj());
+        saveSelectedGraphs();
+        //if (oldData != JSON.stringify(this.graphData)) { } // This was used in the previous version but it seems to just make graphs act weirdly when you're on the same zone?
         if (document.getElementById("rememberCB").checked) {
             applyRememberedSelections();
         }
@@ -256,25 +283,22 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
 }
 
 //TODO While technically functional, 'refresh' does not exist anymore, and I have no idea what a and b are
-function drawGraph(a, b, refresh) {
+function drawGraph() {
     var universe = document.getElementById('universeSelection').options[document.getElementById('universeSelection').options.selectedIndex].value;
+    var selectedGraph;
     if (universe == 'Universe 1') {
-        document.getElementById('u1graphSelection').style.display = ''
-        document.getElementById('u2graphSelection').style.display = 'none'
+        document.getElementById('u1graphSelection').style.display = '';
+        document.getElementById('u2graphSelection').style.display = 'none';
+        selectedGraph = document.getElementById("u1graphSelection");
     }
     if (universe == 'Universe 2') {
-        document.getElementById('u1graphSelection').style.display = 'none'
-        document.getElementById('u2graphSelection').style.display = ''
+        document.getElementById('u1graphSelection').style.display = 'none';
+        document.getElementById('u2graphSelection').style.display = '';
+        selectedGraph = document.getElementById("u2graphSelection");
     }
-    var c = universe == 'Universe 1'
-        ? document.getElementById("u1graphSelection")
-        : universe == 'Universe 2' ? document.getElementById("u2graphSelection") : "Universe 1";
-    if (a === undefined && b === undefined && c.value !== undefined && refresh !== undefined) {
-        graphList[c.value].updateGraph();
+    if (selectedGraph.value) {
+        graphList[selectedGraph.value].updateGraph();
     }
-    a
-        ? (c.selectedIndex--, 0 > c.selectedIndex && (c.selectedIndex = 0))
-        : b && c.selectedIndex != c.options.length - 1 && c.selectedIndex++, graphList[c.value].updateGraph();
 }
 
 
