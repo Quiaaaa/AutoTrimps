@@ -94,7 +94,6 @@ function init() {
         <input onclick="toggleDarkGraphs()" style="height: 20px; float: right; margin-right: 0.5vw;" type="checkbox" id="blackCB">
         <span style="float: right; margin-right: 0.5vw;">Black Graphs:</span>`;
 
-
     MODULES.graphs.themeChanged = function () {
         if (game && game.options.menu.darkTheme.enabled != lastTheme) {
             function f(h) {
@@ -125,7 +124,7 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
     this.selectorText = selectorText ? selectorText : dataVar;
     this.graphTitle = this.selectorText;
     this.customFunction;
-    this.useAccumulator = false;
+    this.useAccumulator;
     this.xTitle = "Zone";
     this.yTitle = this.selectorText;
     this.formatter = null;
@@ -134,12 +133,14 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
     this.yminFloor = null;
     this.yType = "Linear";
     this.graphData = [];
+    this.typeCheck = "number"
+    //this.precision = 0;
     this.conditional = () => { return true };
     this.graphFunc = function () {
-        this.allPurposeGraph(this.dataVar, "number");
+        this.allPurposeGraph();
     }
     for (const [key, value] of Object.entries(additionalParams)) {
-        if (this.hasOwnProperty(key)) this[key] = value;
+        this[key] = value;
     }
     // create an object to pass to Highcharts.Chart
     this.createHighChartsObj = function () {
@@ -230,19 +231,22 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
             applyRememberedSelections();
         }
     }
-    // prepares data series for Highcharts, and optionally transforms it with customFunction or useAccumulator
-    // TODO  customFunction and useAccumulator
-    this.allPurposeGraph = function (item, typeCheck) {
-        var currentPortal = -1;
-        var currentZone = 0;
-        var accumulator = 0;
+    // prepares data series for Highcharts, and optionally transforms it with customFunction and/or useAccumulator
+    this.allPurposeGraph = function () {
+        var item = this.dataVar;
         this.graphData = [];
         for (const portal of Object.values(portalSaveData)) {
             if (!(item in portal.perZoneData)) continue; // ignore blank
             if (portal.universe != GRAPHSETTINGS.universeSelection) continue; // ignore inactive universe
             let cleanData = [];
-            for (x of portal.perZoneData[item]) {
-                if (typeCheck && typeof x != typeCheck) x = null;
+            for (index in portal.perZoneData[item]) {
+                let x = portal.perZoneData[item][index];
+                if (typeof this.customFunction === "function") {
+                    x = this.customFunction(portal, index);
+                    if (x < 0) x = null;
+                }
+                if (this.useAccumulator) x += cleanData.length === 0 ? 0 : cleanData.at(-1);
+                if (this.typeCheck && typeof x != this.typeCheck) x = null;
                 cleanData.push(x)
             }
             this.graphData.push({
@@ -269,22 +273,15 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
     }
 }
 
-//TODO While technically functional, 'refresh' does not exist anymore, and I have no idea what a and b are
+// Draws the graph currently selected by the user
 function drawGraph() {
     GRAPHSETTINGS.universeSelection = document.getElementById('universeSelection').value;
     var universe = GRAPHSETTINGS.universeSelection;
-
-    var selectedGraph;
-    if (universe == 1) {
-        document.getElementById('u1graphSelection').style.display = '';
-        document.getElementById('u2graphSelection').style.display = 'none';
-        selectedGraph = document.getElementById("u1graphSelection");
-    }
-    if (universe == 2) {
-        document.getElementById('u1graphSelection').style.display = 'none';
-        document.getElementById('u2graphSelection').style.display = '';
-        selectedGraph = document.getElementById("u2graphSelection");
-    }
+    var active = `u${universe}`
+    var inactive = `u${universe == 1 ? 2 : 1}`
+    document.getElementById(`${active}graphSelection`).style.display = '';
+    document.getElementById(`${inactive}graphSelection`).style.display = 'none';
+    var selectedGraph = document.getElementById(`${active}graphSelection`);
     if (selectedGraph.value) {
         graphList[selectedGraph.value].updateGraph();
     }
@@ -403,22 +400,6 @@ function setGraphData(graph) {
             };
             yminFloor = 0;
             break;
-        case "Helium - He/Hr":
-            graphData = allPurposeGraph("heliumhr", true, null, function specialCalc(e1, e2) {
-                return Math.floor(e1.heliumOwned / ((e1.currentTime - e1.portalTime) / 3600000));
-            });
-            title = "Helium/Hour (Cumulative)";
-            yTitle = "Helium/Hour";
-            yminFloor = 0;
-            precision = 2;
-            break;
-        case "Helium - Total":
-            graphData = allPurposeGraph("heliumOwned", true, null, function specialCalc(e1, e2) {
-                return Math.floor(e1.heliumOwned);
-            });
-            title = "Helium (Lifetime Total)";
-            yTitle = "Helium";
-            break;
         case "HeHr % / LifetimeHe":
             graphData = allPurposeGraph("hehr", true, "string");
             title = "He/Hr % of LifetimeHe";
@@ -471,44 +452,6 @@ function setGraphData(graph) {
             yTitle = "Rn % of LifetimeRn";
             yminFloor = 0;
             precision = 4;
-            break;
-        case "Fluffy XP":
-            graphData = allPurposeGraph("fluffy", true, "number");
-            title = "Fluffy XP (Lifetime Total)";
-            xTitle = "Zone (starts at 300)";
-            yTitle = "Fluffy XP";
-            xminFloor = 300;
-            break;
-        case "Fluffy XP PerHour":
-            var currentPortal = -1;
-            var currentZone = -1;
-            var startFluffy = 0;
-            graphData = [];
-            for (var i in allSaveData) {
-                if (allSaveData[i].totalPortals != currentPortal) {
-                    graphData.push({
-                        name: "Portal " + allSaveData[i].totalPortals + ": " + allSaveData[i].challenge,
-                        data: [],
-                    });
-                    currentPortal = allSaveData[i].totalPortals;
-                    currentZone = 0;
-                    startFluffy = allSaveData[i].fluffy;
-                }
-                if (currentZone != allSaveData[i].world - 1 && i > 0) {
-                    var loop = allSaveData[i].world - 1 - currentZone;
-                    while (loop > 0) {
-                        graphData[graphData.length - 1].data.push(allSaveData[i - 1][item] * 1);
-                        loop--;
-                    }
-                }
-                if (currentZone != 0) {
-                    graphData[graphData.length - 1].data.push(Math.floor((allSaveData[i].fluffy - startFluffy) / ((allSaveData[i].currentTime - allSaveData[i].portalTime) / 3600000)));
-                }
-                currentZone = allSaveData[i].world;
-            }
-            title = "Fluffy XP/Hour (Cumulative)";
-            yTitle = "Fluffy XP/Hour";
-            xminFloor = 1;
             break;
         case "Scruffy XP":
             graphData = allPurposeGraph("scruffy", true, "number");
@@ -580,18 +523,41 @@ function setGraphData(graph) {
 }
 */
 
+// Custom Function Helpers
+function elapsedTime(portal, i) {
+    return ((portal.perZoneData.currentTime[i] - portal.portalTime) / 3600000)
+}
+
+function dataVarPerHour(dataVar) {
+    return function (portal, i) { return portal.perZoneData[dataVar][i] / elapsedTime(portal, i) }
+}
+
+function diff(dataVar) {
+    return function (portal, i) { return portal.perZoneData[dataVar][i] - portal.perZoneData[dataVar][i - 1] }
+}
+
 // Graph(dataVar, universe, selectorText, additionalParams) {
 // graphTitle, customFunction, useAccumulator, xTitle, yTitle, formatter, valueSuffix, xminFloor, yminFloor, yType
 // The only reason this is an object instead of an array is to make it easier for one function to do a lookup.  yay.
 const graphList = Object.fromEntries([
-    //["hehr", 1, "Helium - He/Hr"],
-    //["heliumOwned", 1, "Helium - Total"],
+    ["heliumOwned", 1, "Helium - He/Hr", {
+        customFunction: dataVarPerHour("heliumOwned")
+    }],
+    ["heliumOwned", 1, "Helium - Total"],
     //["helife", 1, "HeHr % / LifetimeHe"],
     //["helife", 1, "He % / LifetimeHe"],
-    //["fluffy", 1, "Fluffy XP", {
-    //conditional: () => { return game.global.highestLevelCleared >= 300 }
-    //}],
-    //["fluffy", 1, "Fluffy XP PerHour"],
+    ["fluffy", 1, "Fluffy XP", {
+        conditional: () => { return game.global.highestLevelCleared >= 300 },
+        customFunction: function (portal, i) {
+            return portal.perZoneData.fluffy[i] - portal.perZoneData.fluffy[1]
+        }
+    }],
+    ["fluffy", 1, "Fluffy XP PerHour", {
+        conditional: () => { return game.global.highestLevelCleared >= 300 },
+        customFunction: (portal, i) => {
+            return (portal.perZoneData.fluffy[i] - portal.perZoneData.fluffy[1]) / elapsedTime(portal, i)
+        }
+    }],
     ["amals", 1, "Amalgamators"],
     ["wonders", 1, "Wonders", {
         conditional: () => { return getGameData.challengeActive() === "Experience" }
@@ -624,8 +590,16 @@ const graphList = Object.fromEntries([
     }],
     //["nullifium", false, "Nullifium Gained"], // BAR GRAPH
     //["overkill", false, "Overkill Cells"],
-    //["zonetime", false, "Clear Time"],
-    //["zonetime", false, "Cumulative Clear Time"],
+    // TODO double check if there's a better way to do time, also convert types or whatever is needed to get these considered durations by highcharts
+
+    /*
+        customFunction: (portal, i) => { return diff("zoneTime")(portal, i) }
+        customFunction: (portal, i) => { return portal.perZoneData.zoneTime[i] - portal.portalTime }
+    */
+    ["zoneTime", false, "Clear Time",],
+    ["zoneTime", false, "Cumulative Clear Time", {
+        useAccumulator: true
+    }],
     ["mapbonus", false, "Map Bonus"],
     ["empower", false, "Empower", {
         conditional: () => { return getGameData.challengeActive() === "Daily" && typeof game.global.dailyChallenge.empower !== "undefined" }
@@ -640,8 +614,8 @@ const getGameData = {
     nullifium: () => { return recycleAllExtraHeirlooms(true) },
     coord: () => { return game.upgrades.Coordination.allowed - game.upgrades.Coordination.done },
     overkill: () => { return GraphsVars.OVKcellsInWorld },
-    zonetime: () => { return GraphsVars.ZoneStartTime },
-    mapbonus: () => { return GraphsVars.MapBonus },
+    zoneTime: () => { return new Date().getTime() - game.global.zoneStarted },
+    mapbonus: () => { return game.global.mapBonus },
     empower: () => { return game.global.challengeActive == "Daily" && typeof game.global.dailyChallenge.empower !== "undefined" ? game.global.dailyChallenge.empower.stacks : 0 },
     lastwarp: () => { return game.global.lastWarp },
     essence: () => { return game.global.spentEssence + game.global.essence },
@@ -706,19 +680,18 @@ function toggleClearButton() {
     document.getElementById("clrAllDataBtn").disabled = !document.getElementById("clrChkbox").checked;
 }
 
-function addDarkGraphs() {
-    var a = document.getElementById("dark-graph.css");
-    if (!a) {
-        var b = document.createElement("link");
-        (b.rel = "stylesheet"), (b.type = "text/css"), (b.id = "dark-graph.css"), (b.href = basepath + "dark-graph.css"), document.head.appendChild(b), debug("Adding dark-graph.css file", "graphs");
-    }
-}
-function removeDarkGraphs() {
-    var a = document.getElementById("dark-graph.css");
-    a && (document.head.removeChild(a), debug("Removing dark-graph.css file", "graphs"));
-}
-
 function toggleDarkGraphs() {
+    function removeDarkGraphs() {
+        var a = document.getElementById("dark-graph.css");
+        a && (document.head.removeChild(a), debug("Removing dark-graph.css file", "graphs"));
+    }
+    function addDarkGraphs() {
+        var a = document.getElementById("dark-graph.css");
+        if (!a) {
+            var b = document.createElement("link");
+            (b.rel = "stylesheet"), (b.type = "text/css"), (b.id = "dark-graph.css"), (b.href = basepath + "dark-graph.css"), document.head.appendChild(b), debug("Adding dark-graph.css file", "graphs");
+        }
+    }
     if (game) {
         var c = document.getElementById("dark-graph.css"),
             d = document.getElementById("blackCB").checked;
@@ -728,6 +701,7 @@ function toggleDarkGraphs() {
     }
 }
 
+// TODO put this into GRAPHSETTINGS so we can save it
 var rememberSelectedVisible = [];
 function saveSelectedGraphs() {
     rememberSelectedVisible = [];
@@ -747,7 +721,6 @@ function toggleAllGraphs() {
 //Up to date
 function clearData(keepN, clrall = false) {
     var currentPortalNumber = getTotalPortals(true);
-    var currentUniverse = getGameData.universe();
     if (clrall) {
         for (const [portalID, portalData] of Object.entries(portalSaveData)) {
             if (portalData.totalPortals != currentPortalNumber) {
@@ -803,7 +776,7 @@ document.addEventListener(
     function (a) {
         1 != game.options.menu.hotkeys.enabled || game.global.preMapsActive || game.global.lockTooltip || ctrlPressed || heirloomsShown || 27 != a.keyCode || escapeATWindows();
     },
-    !0
+    true
 );
 
 // Up to date (ish)
@@ -822,6 +795,9 @@ function pushData() {
 }
 
 //TODO update to new data var
+// Much of this is now handled by conditional collection of data,
+// everything should be able to be simplified down to 'do we have any of this data?'
+
 function showHideUnusedGraphs() {
     return; // TODO TEMP DISABLE
     // Hide challenge graphs that are not in the saved data
@@ -865,13 +841,8 @@ var GraphsVars = {};
 function InitGraphsVars() {
     GraphsVars.currentPortal = 0;
     GraphsVars.OVKcellsInWorld = 0;
-    GraphsVars.lastOVKcellsInWorld = 0;
     GraphsVars.currentworld = 0;
-    GraphsVars.lastrunworld = 0;
     GraphsVars.aWholeNewWorld = !1;
-    GraphsVars.lastZoneStartTime = 0;
-    GraphsVars.ZoneStartTime = 0;
-    GraphsVars.MapBonus = 0;
     GraphsVars.aWholeNewPortal = 0;
     GraphsVars.currentPortal = 0;
     /*
@@ -904,15 +875,12 @@ function gatherInfo() {
         //if (allSaveData.length > 0 && allSaveData[allSaveData.length - 1].world != world) {
         //}
         GraphsVars.OVKcellsInWorld = 0;
-        GraphsVars.ZoneStartTime = 0;
-        GraphsVars.MapBonus = 0;
+
     }
     if (game.options.menu.overkillColor.enabled == 0) toggleSetting("overkillColor");
     if (game.options.menu.liquification.enabled && game.talents.liquification.purchased && !game.global.mapsActive && game.global.gridArray && game.global.gridArray[0] && game.global.gridArray[0].name == "Liquimp")
         GraphsVars.OVKcellsInWorld = 100;
     else GraphsVars.OVKcellsInWorld = document.getElementById("grid").getElementsByClassName("cellColorOverkill").length;
-    GraphsVars.ZoneStartTime = new Date().getTime() - game.global.zoneStarted;
-    GraphsVars.MapBonus = game.global.mapBonus;
 }
 
 function loadGraphData() {
