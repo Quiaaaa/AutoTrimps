@@ -18,9 +18,12 @@ function debug(message, type, lootIcon) {
 }
 
 var MODULES = {}
-
 // Above code should be in GraphsOnly.js, is here only only for ease of local testing
-var GRAPHSETTINGS = {}
+
+
+var GRAPHSETTINGS = {
+    universeSelection: 1,
+}
 
 var chart1;
 
@@ -37,7 +40,7 @@ function init() {
     var newItem = document.createElement("TD");
     newItem.appendChild(document.createTextNode("Graphs"))
     newItem.setAttribute("class", "btn btn-default")
-    newItem.setAttribute("onclick", "autoToggleGraph(); drawGraph(undefined, undefined, true);");
+    newItem.setAttribute("onclick", "autoToggleGraph(); drawGraph();");
 
     var settingbarRow = document.getElementById("settingsTable").firstElementChild.firstElementChild;
     settingbarRow.insertBefore(newItem, settingbarRow.childNodes[10])
@@ -50,49 +53,31 @@ function init() {
         <div id="graphFooterLine1" style="display: -webkit-flex;flex: 0.75;flex-direction: row; height:30px;"></div>
         <div id="graphFooterLine2"></div></div>`;
 
+    function createSelector(id, sourceList, textMod = "") {
+        var selector = document.createElement("select");
+        selector.id = id;
+        selector.setAttribute("style", "");
+        selector.setAttribute("onchange", "drawGraph()");
+        for (var item of sourceList) {
+            let opt = document.createElement("option");
+            opt.value = item;
+            opt.text = textMod + item;
+            selector.appendChild(opt);
+        }
+        return selector;
+    }
+
     var universeFooter = document.getElementById("graphFooterLine1");
-    var universeList = ["Universe 1", "Universe 2"];
-    var universeSel = document.createElement("select");
-    universeSel.id = "universeSelection";
-    universeSel.setAttribute("style", "");
-    universeSel.setAttribute("onchange", "drawGraph()");
-    for (var item in universeList) {
-        var opt = document.createElement("option");
-        opt.value = universeList[item];
-        opt.text = universeList[item];
-        universeSel.appendChild(opt);
-    }
+    var u1graphList = Object.values(graphList).filter((g) => g.universe == 1 || !g.universe).map((g) => g.selectorText)
+    var u2graphList = Object.values(graphList).filter((g) => g.universe == 2 || !g.universe).map((g) => g.selectorText)
+    var universeSel = createSelector("universeSelection", [1, 2], "Universe ");
+    var u1graphSel = createSelector("u1graphSelection", u1graphList)
+    var u2graphSel = createSelector("u2graphSelection", u2graphList)
 
-    var u1graphList = Object.values(graphList)
-        .filter((graph) => graph.universe == 1 || !graph.universe)
-        .map((graph) => graph.selectorText)
-    var u1graphSel = document.createElement("select");
-    u1graphSel.id = "u1graphSelection"
-    u1graphSel.setAttribute("style", "")
-    u1graphSel.setAttribute("onchange", "drawGraph()");
-    for (var item in u1graphList) {
-        var opt = document.createElement("option");
-        opt.value = u1graphList[item]
-        opt.text = u1graphList[item]
-        u1graphSel.appendChild(opt);
-    }
-
-    var u2graphList = Object.values(graphList)
-        .filter((graph) => graph.universe == 2 || !graph.universe)
-        .map((graph) => graph.selectorText)
-    var u2graphSel = document.createElement("select");
-    u2graphSel.id = "u2graphSelection";
-    u2graphSel.setAttribute("style", "");
-    u2graphSel.setAttribute("onchange", "drawGraph()");
-    for (var item in u2graphList) {
-        var opt = document.createElement("option");
-        opt.value = u2graphList[item]
-        opt.text = u2graphList[item]
-        u2graphSel.appendChild(opt);
-    }
     universeFooter.appendChild(universeSel)
     universeFooter.appendChild(u1graphSel)
     universeFooter.appendChild(u2graphSel)
+
     universeFooter.innerHTML += `
         <div><button onclick="drawGraph()" style="margin-left:0.5em;">Refresh</button></div>
         <div style="flex:0 100 5%;"></div><div><input type="checkbox" id="clrChkbox" onclick="toggleClearButton();"></div>
@@ -151,7 +136,7 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
     this.graphData = [];
     this.conditional = () => { return true };
     this.graphFunc = function () {
-        this.allPurposeGraph(this.dataVar, true, "number");
+        this.allPurposeGraph(this.dataVar, "number");
     }
     for (const [key, value] of Object.entries(additionalParams)) {
         if (this.hasOwnProperty(key)) this[key] = value;
@@ -229,6 +214,7 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
             additionalParams: {},
         }
     }
+    // Main Graphing function
     this.updateGraph = function () {
         //let oldData = JSON.stringify(this.graphData)
         let valueSuffix = this.valueSuffix;
@@ -246,13 +232,14 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
     }
     // prepares data series for Highcharts, and optionally transforms it with customFunction or useAccumulator
     // TODO  customFunction and useAccumulator
-    this.allPurposeGraph = function (item, extraChecks, typeCheck) {
+    this.allPurposeGraph = function (item, typeCheck) {
         var currentPortal = -1;
         var currentZone = 0;
         var accumulator = 0;
         this.graphData = [];
         for (const portal of Object.values(portalSaveData)) {
-            if (!(item in portal.perZoneData)) continue;
+            if (!(item in portal.perZoneData)) continue; // ignore blank
+            if (portal.universe != GRAPHSETTINGS.universeSelection) continue; // ignore inactive universe
             let cleanData = [];
             for (x of portal.perZoneData[item]) {
                 if (typeCheck && typeof x != typeCheck) x = null;
@@ -284,14 +271,16 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
 
 //TODO While technically functional, 'refresh' does not exist anymore, and I have no idea what a and b are
 function drawGraph() {
-    var universe = document.getElementById('universeSelection').options[document.getElementById('universeSelection').options.selectedIndex].value;
+    GRAPHSETTINGS.universeSelection = document.getElementById('universeSelection').value;
+    var universe = GRAPHSETTINGS.universeSelection;
+
     var selectedGraph;
-    if (universe == 'Universe 1') {
+    if (universe == 1) {
         document.getElementById('u1graphSelection').style.display = '';
         document.getElementById('u2graphSelection').style.display = 'none';
         selectedGraph = document.getElementById("u1graphSelection");
     }
-    if (universe == 'Universe 2') {
+    if (universe == 2) {
         document.getElementById('u1graphSelection').style.display = 'none';
         document.getElementById('u2graphSelection').style.display = '';
         selectedGraph = document.getElementById("u2graphSelection");
