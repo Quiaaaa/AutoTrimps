@@ -71,21 +71,17 @@ function init() {
             opt.text = textMod + item;
             selector.appendChild(opt);
         }
+        selector.value = GRAPHSETTINGS[selector.id]
         return selector;
     }
 
     // Create Universe and Graph selectors
     var universeFooter = document.getElementById("graphFooterLine1");
-    let graphsSelectors = [
+    [
         ["universeSelection", [1, 2], "Universe "],
         ["u1graphSelection", graphList.filter((g) => g.universe == 1 || !g.universe).map((g) => g.selectorText)],
         ["u2graphSelection", graphList.filter((g) => g.universe == 2 || !g.universe).map((g) => g.selectorText)]
-    ]
-    for (opts of graphsSelectors) {
-        let selector = createSelector(...opts);
-        universeFooter.appendChild(selector);
-        selector.value = GRAPHSETTINGS[selector.id];
-    }
+    ].forEach((opts) => universeFooter.appendChild(createSelector(...opts)))
 
     universeFooter.innerHTML += `
         <div><button onclick="drawGraph()" style="margin-left:0.5em;">Refresh</button></div>
@@ -95,6 +91,11 @@ function init() {
         <div style="flex:auto; margin-left: 0.5vw;"><button onclick="deleteSpecific(); drawGraph();">Delete Specific Portal</button></div>
         <div style="float:right; margin-right: 0.5vw;"><button onclick="toggleSpecificGraphs()">Invert Selection</button></div>
         <div style="float:right; margin-right: 1vw;"><button onclick="toggleAllGraphs()">All Off/On</button></div>`
+
+    // AAAAAAAAAAAAAAAAAAAAAAAAAAAA (Setting the inner HTML of the parent element resets the value of these? what the fuck)
+    document.querySelector("#universeSelection").value = GRAPHSETTINGS.universeSelection
+    document.querySelector("#u1graphSelection").value = GRAPHSETTINGS.u1graphSelection
+    document.querySelector("#u2graphSelection").value = GRAPHSETTINGS.u2graphSelection
 
     document.getElementById("graphFooterLine2").innerHTML += `
         <span style="float: left;" onmouseover=\'tooltip("Tips", "customText", event, "You can zoom by dragging a box around an area. You can turn portals off by clicking them on the legend. Quickly view the last portal by clicking it off, then Invert Selection. Or by clicking All Off, then clicking the portal on. To delete a portal, Type its portal number in the box and press Delete Specific. Using negative numbers in the Delete Specific box will KEEP that many portals (starting counting backwards from the current one), ie: if you have Portals 1000-1015, typing -10 will keep 1005-1015. There is a browser data storage limitation of 10MB, so do not exceed 20 portals-worth of data.")\' onmouseout=\'tooltip("hide")\'>Tips: Hover for usage tips.</span>
@@ -286,7 +287,7 @@ function drawGraph() {
 }
 
 
-// TODO all of the data in the switch should be in graphList instead, as soon as I decide how to handle accumulators and custom functions
+// TODO make column graphs work again (is it really just a datatype on the series?)
 /*
 function setGraphData(graph) {
     switch (graph) {
@@ -298,7 +299,6 @@ function setGraphData(graph) {
             yTitle = "Refresh";
 
             break;
-        // TODO ALL OF THIS SHOULD BE MOVED TO graphList and the definition of a graph
         case "Void Maps":
             var currentPortal = -1;
             var totalVoids = 0;
@@ -367,35 +367,6 @@ function setGraphData(graph) {
             if (averagenulli) title = "Average " + title + " = " + averagenulli;
             xTitle = "Portal";
             yTitle = "Nullifium Gained";
-
-            break;
-        case "HeHr % / LifetimeHe":
-            graphData = allPurposeGraph("hehr", true, "string");
-            title = "He/Hr % of LifetimeHe";
-            yTitle = "He/Hr % of LifetimeHe";
-            yminFloor = 0;
-            precision = 4;
-            break;
-        case "He % / LifetimeHe":
-            graphData = allPurposeGraph("helife", true, "string");
-            title = "He % of LifetimeHe";
-            yTitle = "He % of LifetimeHe";
-            yminFloor = 0;
-            precision = 4;
-            break;
-        case "RnHr % / LifetimeRn":
-            graphData = allPurposeGraph("rnhr", true, "string");
-            title = "Rn/Hr % of LifetimeRn";
-            yTitle = "Rn/Hr % of LifetimeRn";
-            yminFloor = 0;
-            precision = 4;
-            break;
-        case "Rn % / LifetimeRn":
-            graphData = allPurposeGraph("rnlife", true, "string");
-            title = "Rn % of LifetimeRn";
-            yTitle = "Rn % of LifetimeRn";
-            yminFloor = 0;
-            precision = 4;
             break;
     }
 }
@@ -421,6 +392,12 @@ function diff(dataVar, initial) {
     }
 }
 
+function pctOfInitial(dataVar, initial) {
+    return function (portal, i) {
+        return portal.perZoneData[dataVar][i] / initial;
+    }
+}
+
 var formatters = {
     // TODO get DAYS in here.  And milliseconds. 
     datetime: function () {
@@ -431,14 +408,31 @@ var formatters = {
 
 // Graph(dataVar, universe, selectorText, additionalParams) {
 // graphTitle, customFunction, useAccumulator, xTitle, yTitle, formatter, valueSuffix, xminFloor, yminFloor, yType
+
+/*  TODO
+    The whole He, He/hr, * lifetime, + normalized, is a big ugly mess.  
+    Highcharts can do 'dynamic' graphs, it would be amazing to get all these options on ONE graph, so you have checkboxes instead of 5 graphs
+    Per hour
+    % Lifetime
+    S3 normalized
+
+    Maybe after that I'll figure out how to make these function factory factory functions less ugly
+    I made them up as I went along and it shows
+    a lot
+*/
+
 const graphList = [
     // U1 Graphs
     ["heliumOwned", 1, "Helium - He/Hr", {
         customFunction: dataVarPerHour("heliumOwned")
     }],
     ["heliumOwned", 1, "Helium - Total"],
-    //["helife", 1, "HeHr % / LifetimeHe"],
-    //["helife", 1, "He % / LifetimeHe"],
+    ["heliumOwned", 1, "HeHr % / LifetimeHe", {
+        customFunction: (portal, i) => { return pctOfInitial("heliumOwned", portal.totalHelium)(portal, i) / elapsedHours(portal, i) }
+    }],
+    ["heliumOwned", 1, "He % / LifetimeHe", {
+        customFunction: (portal, i) => { return pctOfInitial("heliumOwned", portal.totalHelium)(portal, i) }
+    }],
     ["fluffy", 1, "Fluffy XP", {
         conditional: () => { return game.global.highestLevelCleared >= 300 },
         customFunction: (portal, i) => { return diff("fluffy", portal.initialFluffy)(portal, i) }
@@ -453,7 +447,6 @@ const graphList = [
     }],
 
     // U2 Graphs
-    // TODO test all of these
     ["radonOwned", 2, "Radon - Rn/Hr", {
         customFunction: dataVarPerHour("radonOwned")
     }],
@@ -461,8 +454,12 @@ const graphList = [
         customFunction: (portal, i) => { return dataVarPerHour("radonOwned")(portal, i) / 1.03 ** portal.s3 }
     }],
     ["radonOwned", 2, "Radon - Total"],
-    //["rnlife", 2, "RnHr % / LifetimeRn"],
-    //["rnlife", 2, "Rn % / LifetimeRn"],
+    ["radonOwned", 2, "RnHr % / LifetimeRn", {
+        customFunction: (portal, i) => { return pctOfInitial("radonOwned", portal.totalRadon)(portal, i) / elapsedHours(portal, i) }
+    }],
+    ["radonOwned", 2, "Rn % / LifetimeRn", {
+        customFunction: (portal, i) => { return pctOfInitial("radonOwned", portal.totalRadon)(portal, i) }
+    }],
     ["smithies", 2, "Smithies"],
     ["scruffy", 2, "Scruffy XP", {
         customFunction: (portal, i) => { return diff("scruffy", portal.initialScruffy)(portal, i) }
@@ -470,7 +467,9 @@ const graphList = [
     ["scruffy", 2, "Scruffy XP PerHour", {
         customFunction: (portal, i) => { return diff("scruffy", portal.initialScruffy)(portal, i) / elapsedHours(portal, i) }
     }],
-    ["worshippers", 2, "Worshippers"],
+    ["worshippers", 2, "Worshippers", {
+        conditional: () => { return game.global.highestRadonLevelCleared >= 50 }
+    }],
     ["bonfires", 2, "Bonfires", {
         graphTitle: "Active Bonfires",
         conditional: () => { return getGameData.challengeActive() === "Hypothermia" }
@@ -490,7 +489,7 @@ const graphList = [
     ["coord", false, "Coordinations", {
         graphTitle: "Unbought Coordinations",
     }],
-    //["nullifium", false, "Nullifium Gained"], // BAR GRAPH
+    //["nullifium", false, "Nullifium Gained"], // TODO BAR GRAPH
     ["overkill", false, "Overkill Cells"],
     ["currentTime", false, "Clear Time", {
         customFunction: (portal, i) => { return Math.round(diff("currentTime")(portal, i)) },
@@ -502,7 +501,7 @@ const graphList = [
         yType: "datetime",
         formatter: formatters.datetime
     }],
-    ["mapbonus", false, "Map Bonus"],
+    ["mapbonus", false, "Map Bonus"], // TODO this one graph is not indexing x properly ???
     ["empower", false, "Empower", {
         conditional: () => { return getGameData.challengeActive() === "Daily" && typeof game.global.dailyChallenge.empower !== "undefined" }
     }]
@@ -548,11 +547,6 @@ const getGameData = {
     universe: () => { return game.global.universe },
     portalTime: () => { return game.global.portalTime },
     s3: () => { return game.global.lastRadonPortal },
-    // TODO These should be derivable at graph-time rather than stored
-    //var getPercent = (game.stats.heliumHour.value() / (game.global.totalHeliumEarned - (game.global.heliumLeftover + game.resources.helium.owned))) * 100;
-    //var lifetime = (game.resources.helium.owned / (game.global.totalHeliumEarned - game.resources.helium.owned)) * 100;
-    //var RgetPercent = (game.stats.heliumHour.value() / (game.global.totalRadonEarned - (game.global.radonLeftover + game.resources.radon.owned))) * 100;
-    //var Rlifetime = (game.resources.radon.owned / (game.global.totalRadonEarned - game.resources.radon.owned)) * 100;
 }
 
 function Portal() {
@@ -661,8 +655,8 @@ function deleteSpecific() {
     showHideUnusedGraphs();
 }
 
+// show graph window
 function autoToggleGraph() {
-    // TODO 
     game.options.displayed && toggleSettingsMenu();
     var a = document.getElementById("autoSettings");
     a && "block" === a.style.display && (a.style.display = "none");
@@ -671,6 +665,7 @@ function autoToggleGraph() {
     var b = document.getElementById("graphParent");
     "block" === b.style.display ? (b.style.display = "none") : ((b.style.display = "block")); // , displayGraph()
 }
+// focus main game
 function escapeATWindows() {
     var a = document.getElementById("tooltipDiv");
     if ("none" != a.style.display) return void cancelTooltip();
@@ -685,12 +680,14 @@ function escapeATWindows() {
 document.addEventListener(
     "keydown",
     function (a) {
-        1 != game.options.menu.hotkeys.enabled || game.global.preMapsActive || game.global.lockTooltip || ctrlPressed || heirloomsShown || 27 != a.keyCode || escapeATWindows();
+        1 != game.options.menu.hotkeys.enabled || game.global.preMapsActive || game.global.lockTooltip
+            || ctrlPressed || heirloomsShown || 27 != a.keyCode || escapeATWindows();
     },
     true
 );
 
 // Up to date (ish)
+// TODO the game thinks a portal starts on the portal screen when you swap universes, instead of when you start a portal.  Urk.
 function pushData() {
     debug("Starting Zone " + getGameData.world(), "graphs");
     const portalID = `u${getGameData.universe()} p${getTotalPortals(true)}`
@@ -699,31 +696,23 @@ function pushData() {
     }
     portalSaveData[portalID].update();
     //clearData(10); // TODO this value should be different now wheee
-    // TODO OH GOD DON'T FORCE SAVES TO LOCALSTORAGE UNLESS DATA HAS CHANGED
-    // Alternately, could we please wrap the <change zone> function instead of running on a timer?
     safeSetItems("portalSaveData", JSON.stringify(portalSaveData));
     showHideUnusedGraphs();
 }
 
-//TODO update to new data var
-// Much of this is now handled by conditional collection of data,
-// everything should be able to be simplified down to 'do we have any of this data?'
-
 function showHideUnusedGraphs() {
-    return; // TODO TEMP DISABLE
-    // Hide challenge graphs that are not in the saved data
-    const graphedChallenges = [...new Set(allSaveData.map((data) => data = data.challenge))];
-    const perChallengeGraphs = {
-        Hypothermia: { graphs: ["Bonfires", "Embers"], universe: "u2" },
-        Nurture: { graphs: ["Cruffys"], universe: "u2" },
-        Experience: { graphs: ["Wonders"], universe: "u1" }
-    };
-    for (const [challenge, data] of Object.entries(perChallengeGraphs)) {
-        const graphs = data.graphs;
-        const style = graphedChallenges.includes(challenge) ? "" : "none";
-        graphs.forEach((graph) => { document.querySelector(`#${data.universe}graphSelection [value=${graph}]`).style.display = style; })
+    // Hide graphs that have no collected data
+    for (const graph of graphList) {
+        graph.allPurposeGraph(); // TODO this seems excessive, there is almost certainly a cheaper way to check this
+        let graphData = graph.graphData
+        const style = graphData.length === 0 ? "none" : "";
+        const universes = graph.universe ? [graph.universe] : ["1", "2"]
+        for (const universe of universes) {
+            document.querySelector(`#u${universe}graphSelection [value="${graph.selectorText}"]`).style.display = style;
+        }
     }
-    // Hide specific graphs that are constant (either not unlocked yet, or maxed)
+    return
+    // TODO Hide specific graphs that are constant (either not unlocked yet, or maxed)
     const emptyGraphs = {
         OverkillCells: { dataName: "overkill" },
         Worshippers: { universe: "u2" },
@@ -775,4 +764,6 @@ var portalSaveData = {}
 loadGraphData();
 init()
 var lastTheme = -1;
+
+// TODO put this in a Proxy/wrapper instead of a setInterval to avoid all the 'too slow' data errors
 setInterval(gatherInfo, 100);
