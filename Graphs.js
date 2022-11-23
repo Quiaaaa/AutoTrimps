@@ -258,7 +258,7 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
                 }
                 if (this.useAccumulator) x += cleanData.length === 0 ? 0 : cleanData.at(-1);
                 if (this.typeCheck && typeof x != this.typeCheck) x = null;
-                if (x) cleanData.push([index, x])
+                cleanData.push(x)
             }
             this.graphData.push({
                 name: `Portal ${portal.totalPortals}: ${portal.challenge}`,
@@ -501,7 +501,7 @@ const graphList = [
         yType: "datetime",
         formatter: formatters.datetime
     }],
-    ["mapbonus", false, "Map Bonus"], // TODO this one graph is not indexing x properly ???
+    ["mapbonus", false, "Map Bonus"], // TODO this one graph is not indexing x properly ??? nevermind fluffyexp also not indexing properly
     ["empower", false, "Empower", {
         conditional: () => { return getGameData.challengeActive() === "Daily" && typeof game.global.dailyChallenge.empower !== "undefined" }
     }]
