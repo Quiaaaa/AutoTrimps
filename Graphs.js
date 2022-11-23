@@ -23,6 +23,13 @@ var MODULES = {}
 
 var GRAPHSETTINGS = {
     universeSelection: 1,
+    u1graphSelection: null,
+    u2graphSelection: null
+}
+
+function saveSetting(key, value) {
+    if (key !== null && value !== null) GRAPHSETTINGS[key] = value;
+    safeSetItems("GRAPHSETTINGS", JSON.stringify(GRAPHSETTINGS));
 }
 
 var chart1;
@@ -54,10 +61,10 @@ function init() {
         <div id="graphFooterLine2"></div></div>`;
 
     function createSelector(id, sourceList, textMod = "") {
-        var selector = document.createElement("select");
+        let selector = document.createElement("select");
         selector.id = id;
         selector.setAttribute("style", "");
-        selector.setAttribute("onchange", "drawGraph()");
+        selector.setAttribute("onchange", "saveSetting(this.id, this.value); drawGraph(); ");
         for (var item of sourceList) {
             let opt = document.createElement("option");
             opt.value = item;
@@ -67,16 +74,18 @@ function init() {
         return selector;
     }
 
+    // Create Universe and Graph selectors
     var universeFooter = document.getElementById("graphFooterLine1");
-    var u1graphList = Object.values(graphList).filter((g) => g.universe == 1 || !g.universe).map((g) => g.selectorText)
-    var u2graphList = Object.values(graphList).filter((g) => g.universe == 2 || !g.universe).map((g) => g.selectorText)
-    var universeSel = createSelector("universeSelection", [1, 2], "Universe ");
-    var u1graphSel = createSelector("u1graphSelection", u1graphList)
-    var u2graphSel = createSelector("u2graphSelection", u2graphList)
-
-    universeFooter.appendChild(universeSel)
-    universeFooter.appendChild(u1graphSel)
-    universeFooter.appendChild(u2graphSel)
+    let graphsSelectors = [
+        ["universeSelection", [1, 2], "Universe "],
+        ["u1graphSelection", graphList.filter((g) => g.universe == 1 || !g.universe).map((g) => g.selectorText)],
+        ["u2graphSelection", graphList.filter((g) => g.universe == 2 || !g.universe).map((g) => g.selectorText)]
+    ]
+    for (opts of graphsSelectors) {
+        let selector = createSelector(...opts);
+        universeFooter.appendChild(selector);
+        selector.value = GRAPHSETTINGS[selector.id];
+    }
 
     universeFooter.innerHTML += `
         <div><button onclick="drawGraph()" style="margin-left:0.5em;">Refresh</button></div>
@@ -127,10 +136,10 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
     this.useAccumulator;
     this.xTitle = "Zone";
     this.yTitle = this.selectorText;
-    this.formatter = null;
+    this.formatter;
     this.valueSuffix = "";
     this.xminFloor = 1;
-    this.yminFloor = null;
+    this.yminFloor;
     this.yType = "Linear";
     this.graphData = [];
     this.typeCheck = "number"
@@ -220,10 +229,11 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
         //let oldData = JSON.stringify(this.graphData)
         let valueSuffix = this.valueSuffix;
         this.graphFunc();
-        this.formatter = function () {
-            var ser = this.series; // this is the most fucking confusing use of 'this' ever, this function is called by a highcharts object
-            return '<span style="color:' + ser.color + '" >●</span> ' + ser.name + ": <b>" + prettify(this.y) + valueSuffix + "</b><br>";
-        };
+        this.formatter = this.formatter
+            || function () {
+                var ser = this.series; // this is the most fucking confusing use of 'this' ever, this function is called by a highcharts object
+                return '<span style="color:' + ser.color + '" >●</span> ' + ser.name + ": <b>" + prettify(this.y) + valueSuffix + "</b><br>";
+            };
         chart1 = new Highcharts.Chart(this.createHighChartsObj());
         saveSelectedGraphs();
         //if (oldData != JSON.stringify(this.graphData)) { } // This was used in the previous version but it seems to just make graphs act weirdly when you're on the same zone?
@@ -247,35 +257,23 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
                 }
                 if (this.useAccumulator) x += cleanData.length === 0 ? 0 : cleanData.at(-1);
                 if (this.typeCheck && typeof x != this.typeCheck) x = null;
-                cleanData.push(x)
+                if (x) cleanData.push([index, x])
             }
             this.graphData.push({
                 name: `Portal ${portal.totalPortals}: ${portal.challenge}`,
                 data: cleanData,
-                //universe: portal.universe
             })
-            //TODO This is 100% not finished and I forget where I left off
-            /*
-            if (this.customFunction && !this.useAccumulator) {
-                graphData.data = graphData.data.map((a, b) => { let out = this.customFunction(a, b); return out < 0 ? 1 : out; });
-            } else if (this.customFunction && this.useAccumulator) {
-                
-                let tempData = graphData.data.map((a))
-                    accumulator += this.customFunction(allSaveData[i], allSaveData[i - 1]);
-                if (accumulator < 0) accumulator = 1;
-                graphData[graphData.length - 1].data.push(accumulator);
-            } else {
-                if (allSaveData[i][item] >= 0) graphData[graphData.length - 1].data.push(allSaveData[i][item] * 1);
-                else if (extraChecks) graphData[graphData.length - 1].data.push(-1);
-            }
-            */
         }
     }
 }
 
 // Draws the graph currently selected by the user
 function drawGraph() {
-    GRAPHSETTINGS.universeSelection = document.getElementById('universeSelection').value;
+    function lookupGraph(selectorText) {
+        for (const graph of graphList) {
+            if (graph.selectorText === selectorText) return graph;
+        }
+    }
     var universe = GRAPHSETTINGS.universeSelection;
     var active = `u${universe}`
     var inactive = `u${universe == 1 ? 2 : 1}`
@@ -283,7 +281,7 @@ function drawGraph() {
     document.getElementById(`${inactive}graphSelection`).style.display = 'none';
     var selectedGraph = document.getElementById(`${active}graphSelection`);
     if (selectedGraph.value) {
-        graphList[selectedGraph.value].updateGraph();
+        lookupGraph(selectedGraph.value).updateGraph();
     }
 }
 
@@ -371,35 +369,6 @@ function setGraphData(graph) {
             yTitle = "Nullifium Gained";
 
             break;
-
-        case "Clear Time":
-            graphData = allPurposeGraph("cleartime1", true, null, function specialCalc(e1, e2) {
-                return Math.round((e1.currentTime - e2.currentTime - (e1.portalTime - e2.portalTime)) / 1000);
-            });
-            title = "Time to clear zone";
-            yTitle = "Clear Time";
-            valueSuffix = " Seconds";
-            yminFloor = 0;
-            break;
-        case "Cumulative Clear Time":
-            graphData = allPurposeGraph(
-                "cumucleartime1",
-                true,
-                null,
-                function specialCalc(e1, e2) {
-                    return Math.round(e1.currentTime - e2.currentTime - (e1.portalTime - e2.portalTime));
-                },
-                true
-            );
-            title = "Cumulative Time (at END of zone#)";
-            yTitle = "Cumulative Clear Time";
-            yType = "datetime";
-            formatter = function () {
-                var ser = this.series;
-                return '<span style="color:' + ser.color + '" >●</span> ' + ser.name + ": <b>" + Highcharts.dateFormat("%H:%M:%S", this.y) + "</b><br>";
-            };
-            yminFloor = 0;
-            break;
         case "HeHr % / LifetimeHe":
             graphData = allPurposeGraph("hehr", true, "string");
             title = "He/Hr % of LifetimeHe";
@@ -413,31 +382,6 @@ function setGraphData(graph) {
             yTitle = "He % of LifetimeHe";
             yminFloor = 0;
             precision = 4;
-            break;
-        case "Radon - Rn/Hr":
-            graphData = allPurposeGraph("radonhr", true, null, function specialCalc(e1, e2) {
-                return Math.floor(e1.radonOwned / ((e1.currentTime - e1.portalTime) / 3600000));
-            });
-            title = "Radon/Hour (Cumulative)";
-            yTitle = "Radon/Hour";
-            yminFloor = 0;
-            precision = 2;
-            break;
-        case "Radon - Rn/Hr Normalized":
-            graphData = allPurposeGraph("radonhr", true, null, function specialCalc(e1, e2) {
-                return Math.floor(e1.radonOwned / 1.03 ** e1.s3 / ((e1.currentTime - e1.portalTime) / 3600000));
-            });
-            title = "Radon/Hour (Cumulative, S3 Normalized)";
-            yTitle = "Radon/Hour";
-            yminFloor = 0;
-            precision = 2;
-            break;
-        case "Radon - Total":
-            graphData = allPurposeGraph("radonOwned", true, null, function specialCalc(e1, e2) {
-                return Math.floor(e1.radonOwned);
-            });
-            title = "Radon (Lifetime Total)";
-            yTitle = "Radon";
             break;
         case "RnHr % / LifetimeRn":
             graphData = allPurposeGraph("rnhr", true, "string");
@@ -453,93 +397,42 @@ function setGraphData(graph) {
             yminFloor = 0;
             precision = 4;
             break;
-        case "Scruffy XP":
-            graphData = allPurposeGraph("scruffy", true, "number");
-            title = "Scruffy XP (Lifetime Total)";
-            yTitle = "Scruffy XP";
-            xminFloor = 0;
-            break;
-        case "Scruffy XP PerHour":
-            var currentPortal = -1;
-            var currentZone = -1;
-            var startScruffy = 0;
-            graphData = [];
-            for (var i in allSaveData) {
-                if (allSaveData[i].totalPortals != currentPortal) {
-                    graphData.push({
-                        name: "Portal " + allSaveData[i].totalPortals + ": " + allSaveData[i].challenge,
-                        data: [],
-                    });
-                    currentPortal = allSaveData[i].totalPortals;
-                    currentZone = 0;
-                    startScruffy = allSaveData[i].scruffy;
-                }
-                if (currentZone != allSaveData[i].world - 1 && i > 0) {
-                    var loop = allSaveData[i].world - 1 - currentZone;
-                    while (loop > 0) {
-                        graphData[graphData.length - 1].data.push(allSaveData[i - 1][item] * 1);
-                        loop--;
-                    }
-                }
-                if (currentZone != 0) {
-                    graphData[graphData.length - 1].data.push(Math.floor((allSaveData[i].scruffy - startScruffy) / ((allSaveData[i].currentTime - allSaveData[i].portalTime) / 3600000)));
-                }
-                currentZone = allSaveData[i].world;
-            }
-            title = "Scruffy XP/Hour (Cumulative)";
-            yTitle = "Scruffy XP/Hour";
-            xminFloor = 1;
-            break;
-        case "OverkillCells":
-            var currentPortal = -1;
-            graphData = [];
-            for (var i in allSaveData) {
-                if (allSaveData[i].totalPortals != currentPortal) {
-                    graphData.push({
-                        name: "Portal " + allSaveData[i].totalPortals + ": " + allSaveData[i].challenge,
-                        data: [],
-                    });
-                    currentPortal = allSaveData[i].totalPortals;
-                    if (allSaveData[i].world == 1 && currentZone != -1) graphData[graphData.length - 1].data.push(0);
-
-                    if (currentZone == -1 || allSaveData[i].world != 1) {
-                        var loop = allSaveData[i].world;
-                        while (loop > 0) {
-                            graphData[graphData.length - 1].data.push(0);
-                            loop--;
-                        }
-                    }
-                }
-                if (currentZone < allSaveData[i].world && currentZone != -1) {
-                    var num = allSaveData[i].overkill;
-                    if (num) graphData[graphData.length - 1].data.push(num);
-                }
-                currentZone = allSaveData[i].world;
-            }
-            title = "Overkilled Cells";
-            yTitle = "Overkilled Cells";
-            break;
     }
 }
 */
 
 // Custom Function Helpers
-function elapsedTime(portal, i) {
-    return ((portal.perZoneData.currentTime[i] - portal.portalTime) / 3600000)
+function elapsedHours(portal, i) {
+    let time = portal.perZoneData.currentTime[i];
+    return (time - portal.portalTime) / 3600000
 }
 
 function dataVarPerHour(dataVar) {
-    return function (portal, i) { return portal.perZoneData[dataVar][i] / elapsedTime(portal, i) }
+    return function (portal, i) { return portal.perZoneData[dataVar][i] / elapsedHours(portal, i) }
 }
 
-function diff(dataVar) {
-    return function (portal, i) { return portal.perZoneData[dataVar][i] - portal.perZoneData[dataVar][i - 1] }
+// diff between x and x-1, or x and initial
+function diff(dataVar, initial) {
+    return function (portal, i) {
+        let e1 = portal.perZoneData[dataVar][i];
+        let e2 = initial ? initial : portal.perZoneData[dataVar][i - 1];
+        if (e1 === null || e2 === null) return null;
+        return e1 - e2
+    }
+}
+
+var formatters = {
+    // TODO get DAYS in here.  And milliseconds. 
+    datetime: function () {
+        var ser = this.series;
+        return '<span style="color:' + ser.color + '" >●</span> ' + ser.name + ": <b>" + Highcharts.dateFormat("%H:%M:%S", this.y) + "</b><br>";
+    },
 }
 
 // Graph(dataVar, universe, selectorText, additionalParams) {
 // graphTitle, customFunction, useAccumulator, xTitle, yTitle, formatter, valueSuffix, xminFloor, yminFloor, yType
-// The only reason this is an object instead of an array is to make it easier for one function to do a lookup.  yay.
-const graphList = Object.fromEntries([
+const graphList = [
+    // U1 Graphs
     ["heliumOwned", 1, "Helium - He/Hr", {
         customFunction: dataVarPerHour("heliumOwned")
     }],
@@ -548,28 +441,35 @@ const graphList = Object.fromEntries([
     //["helife", 1, "He % / LifetimeHe"],
     ["fluffy", 1, "Fluffy XP", {
         conditional: () => { return game.global.highestLevelCleared >= 300 },
-        customFunction: function (portal, i) {
-            return portal.perZoneData.fluffy[i] - portal.perZoneData.fluffy[1]
-        }
+        customFunction: (portal, i) => { return diff("fluffy", portal.initialFluffy)(portal, i) }
     }],
     ["fluffy", 1, "Fluffy XP PerHour", {
         conditional: () => { return game.global.highestLevelCleared >= 300 },
-        customFunction: (portal, i) => {
-            return (portal.perZoneData.fluffy[i] - portal.perZoneData.fluffy[1]) / elapsedTime(portal, i)
-        }
+        customFunction: (portal, i) => { return diff("fluffy", portal.initialFluffy)(portal, i) / elapsedHours(portal, i) }
     }],
     ["amals", 1, "Amalgamators"],
     ["wonders", 1, "Wonders", {
         conditional: () => { return getGameData.challengeActive() === "Experience" }
     }],
-    //["rnhr", 2, "Radon - Rn/Hr"],
-    //["rnhr", 2, "Radon - Rn/Hr Normalized"],
-    //["radonOwned", 2, "Radon - Total"],
+
+    // U2 Graphs
+    // TODO test all of these
+    ["radonOwned", 2, "Radon - Rn/Hr", {
+        customFunction: dataVarPerHour("radonOwned")
+    }],
+    ["radonOwned", 2, "Radon - Rn/Hr Normalized", {
+        customFunction: (portal, i) => { return dataVarPerHour("radonOwned")(portal, i) / 1.03 ** portal.s3 }
+    }],
+    ["radonOwned", 2, "Radon - Total"],
     //["rnlife", 2, "RnHr % / LifetimeRn"],
     //["rnlife", 2, "Rn % / LifetimeRn"],
     ["smithies", 2, "Smithies"],
-    //["scruffy", 2, "Scruffy XP"],
-    //["scruffy", 2, "Scruffy XP PerHour"],
+    ["scruffy", 2, "Scruffy XP", {
+        customFunction: (portal, i) => { return diff("scruffy", portal.initialScruffy)(portal, i) }
+    }],
+    ["scruffy", 2, "Scruffy XP PerHour", {
+        customFunction: (portal, i) => { return diff("scruffy", portal.initialScruffy)(portal, i) / elapsedHours(portal, i) }
+    }],
     ["worshippers", 2, "Worshippers"],
     ["bonfires", 2, "Bonfires", {
         graphTitle: "Active Bonfires",
@@ -581,6 +481,8 @@ const graphList = Object.fromEntries([
     ["cruffys", 2, "Cruffys", {
         conditional: () => { return getGameData.challengeActive() === "Nurture" }
     }],
+
+    // Generic Graphs
     ["voids", false, "Void Map History", {
         graphTitle: "Void Map History (voids finished during the same level acquired are not counted/tracked)",
         yTitle: "Number of Void Maps",
@@ -589,22 +491,22 @@ const graphList = Object.fromEntries([
         graphTitle: "Unbought Coordinations",
     }],
     //["nullifium", false, "Nullifium Gained"], // BAR GRAPH
-    //["overkill", false, "Overkill Cells"],
-    // TODO double check if there's a better way to do time, also convert types or whatever is needed to get these considered durations by highcharts
-
-    /*
-        customFunction: (portal, i) => { return diff("zoneTime")(portal, i) }
-        customFunction: (portal, i) => { return portal.perZoneData.zoneTime[i] - portal.portalTime }
-    */
-    ["zoneTime", false, "Clear Time",],
-    ["zoneTime", false, "Cumulative Clear Time", {
-        useAccumulator: true
+    ["overkill", false, "Overkill Cells"],
+    ["currentTime", false, "Clear Time", {
+        customFunction: (portal, i) => { return Math.round(diff("currentTime")(portal, i)) },
+        yType: "datetime",
+        formatter: formatters.datetime
+    }],
+    ["currentTime", false, "Cumulative Clear Time", {
+        customFunction: (portal, i) => { return Math.round(diff("currentTime", portal.portalTime)(portal, i)) },
+        yType: "datetime",
+        formatter: formatters.datetime
     }],
     ["mapbonus", false, "Map Bonus"],
     ["empower", false, "Empower", {
         conditional: () => { return getGameData.challengeActive() === "Daily" && typeof game.global.dailyChallenge.empower !== "undefined" }
     }]
-].map(graph => { let data = new Graph(...graph); return [data.selectorText, data] }));
+].map(opts => new Graph(...opts));
 
 const getGameData = {
     currentTime: () => { return new Date().getTime() },
@@ -613,7 +515,13 @@ const getGameData = {
     voids: () => { return game.global.totalVoidMaps },
     nullifium: () => { return recycleAllExtraHeirlooms(true) },
     coord: () => { return game.upgrades.Coordination.allowed - game.upgrades.Coordination.done },
-    overkill: () => { return GraphsVars.OVKcellsInWorld },
+    overkill: () => {
+        // overly complex check for Liq, overly fragile check for overkill cells
+        if (game.options.menu.overkillColor.enabled == 0) toggleSetting("overkillColor");
+        if (game.options.menu.liquification.enabled && game.talents.liquification.purchased && !game.global.mapsActive && game.global.gridArray && game.global.gridArray[0] && game.global.gridArray[0].name == "Liquimp")
+            return 100;
+        else return document.getElementById("grid").getElementsByClassName("cellColorOverkill").length;
+    },
     zoneTime: () => { return new Date().getTime() - game.global.zoneStarted },
     mapbonus: () => { return game.global.mapBonus },
     empower: () => { return game.global.challengeActive == "Daily" && typeof game.global.dailyChallenge.empower !== "undefined" ? game.global.dailyChallenge.empower.stacks : 0 },
@@ -647,11 +555,6 @@ const getGameData = {
     //var Rlifetime = (game.resources.radon.owned / (game.global.totalRadonEarned - game.resources.radon.owned)) * 100;
 }
 
-// TODO save these in their own localstorage
-//this.perZoneData.universeSelection[world] = document.getElementById('universeSelection').options[document.getElementById('universeSelection').options.selectedIndex].value
-//this.perZoneData.u1graphSelection[world] = document.getElementById('u1graphSelection').options[document.getElementById('u1graphSelection').options.selectedIndex].value
-//this.perZoneData.u2graphSelection[world] = document.getElementById('u2graphSelection').options[document.getElementById('u2graphSelection').options.selectedIndex].value
-
 function Portal() {
     this.universe = getGameData.universe();
     this.totalPortals = getTotalPortals(true);
@@ -659,8 +562,16 @@ function Portal() {
     this.challenge = getGameData.challengeActive() === 'Daily'
         ? getCurrentChallengePane().split('.')[0].substr(13).slice(0, 16) // names dailies by their start date, only moderately cursed
         : getGameData.challengeActive();
-    this.s3 = getGameData.s3(); // TODO would be nice to only save this in U2... 
-    this.perZoneData = Object.fromEntries(Object.values(graphList)
+    if (this.universe === 1) {
+        this.totalHelium = game.global.totalHeliumEarned;
+        this.initialFluffy = getGameData.fluffy();
+    }
+    if (this.universe === 2) {
+        this.totalRadon = game.global.totalRadonEarned;
+        this.initialScruffy = getGameData.scruffy();
+        this.s3 = getGameData.s3();
+    }
+    this.perZoneData = Object.fromEntries(graphList
         .filter((graph) =>
             (graph.universe == this.universe || !graph.universe) // only save data relevant to the current universe
             && graph.conditional()) // and for relevant challenges
@@ -836,65 +747,26 @@ function initializeData() {
     if (0 === portalSaveData.length) pushData();
 }
 
-//TODO figure out why and where these are needed
-var GraphsVars = {};
-function InitGraphsVars() {
-    GraphsVars.currentPortal = 0;
-    GraphsVars.OVKcellsInWorld = 0;
-    GraphsVars.currentworld = 0;
-    GraphsVars.aWholeNewWorld = !1;
-    GraphsVars.aWholeNewPortal = 0;
-    GraphsVars.currentPortal = 0;
-    /*
-    if (allSaveData.length > 0) {
-        // TODO are these three vars seriously saved on every single zone just to keep them in memory?  Put them in their own settings in localstorage ffs
-        if (allSaveData[allSaveData.length - 1].universeSelection !== undefined)
-            document.getElementById('universeSelection').value = allSaveData[allSaveData.length - 1].universeSelection
-        if (allSaveData[allSaveData.length - 1].u1graphSelection !== undefined)
-            document.getElementById('u1graphSelection').value = allSaveData[allSaveData.length - 1].u1graphSelection
-        if (allSaveData[allSaveData.length - 1].u2graphSelection !== undefined)
-            document.getElementById('u2graphSelection').value = allSaveData[allSaveData.length - 1].u2graphSelection
-    }
-    */
-};
-
-// TODO unravel mess of GraphVars
 function gatherInfo() {
     if (game.options.menu.pauseGame.enabled) return;
     initializeData();
-    const world = getGameData.world();
-    GraphsVars.aWholeNewPortal = GraphsVars.currentPortal != getTotalPortals(true);
-    if (GraphsVars.aWholeNewPortal) {
-        GraphsVars.currentPortal = getTotalPortals(true);
-    }
-    GraphsVars.aWholeNewWorld = GraphsVars.currentworld != world;
-    if (GraphsVars.aWholeNewWorld) {
-        GraphsVars.currentworld = world;
-        // TODO the most awful short circuit, this is 100% awful and is only here because I want to take the update off a setInterval and on to a wrapper
-        pushData();
-        //if (allSaveData.length > 0 && allSaveData[allSaveData.length - 1].world != world) {
-        //}
-        GraphsVars.OVKcellsInWorld = 0;
-
-    }
-    if (game.options.menu.overkillColor.enabled == 0) toggleSetting("overkillColor");
-    if (game.options.menu.liquification.enabled && game.talents.liquification.purchased && !game.global.mapsActive && game.global.gridArray && game.global.gridArray[0] && game.global.gridArray[0].name == "Liquimp")
-        GraphsVars.OVKcellsInWorld = 100;
-    else GraphsVars.OVKcellsInWorld = document.getElementById("grid").getElementsByClassName("cellColorOverkill").length;
+    if (getGameData.world()) pushData();
 }
 
 function loadGraphData() {
     loadedData = JSON.parse(localStorage.getItem("portalSaveData"));
     if (loadedData !== null) {
         console.log("Graphs: Found portalSaveData")
+        // remake object structure
         for (const [portalID, portalData] of Object.entries(loadedData)) {
             portalSaveData[portalID] = new Portal();
-            // this seems awkward? 
             for (const [k, v] of Object.entries(portalData)) {
                 portalSaveData[portalID][k] = v;
             }
         }
     }
+    loadedSettings = JSON.parse(localStorage.getItem("GRAPHSETTINGS"));
+    if (loadedSettings !== null) GRAPHSETTINGS = loadedSettings;
     MODULES.graphs = {}
     MODULES.graphs.useDarkAlways = false
 }
@@ -902,6 +774,5 @@ function loadGraphData() {
 var portalSaveData = {}
 loadGraphData();
 init()
-InitGraphsVars();
 var lastTheme = -1;
 setInterval(gatherInfo, 100);
