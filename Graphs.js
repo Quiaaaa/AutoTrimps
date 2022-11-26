@@ -433,8 +433,8 @@ const graphList = [
     ["overkill", false, "Overkill Cells", {
         // Overkill unlock zones (roughly)
         conditional: () => {
-            return ((getGameData.universe() == 1 && getGameData.u1hze >= 170)
-                || getGameData.universe() == 2 && getGameData.u2hze >= 201)
+            return ((getGameData.universe() == 1 && getGameData.u1hze() >= 170)
+                || getGameData.universe() == 2 && getGameData.u2hze() >= 201)
         }
     }],
     ["currentTime", false, "Clear Time", {
