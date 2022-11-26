@@ -2,7 +2,11 @@ var basepath = 'AutoTrimps/' // LOCAL ONLY
 
 function safeSetItems(name, data) {
     try {
-        localStorage.setItem(name, data);
+        if (name === "portalSaveData") {
+            if ((new Date() - lastSave) / 10000 < 1) return // save at most every 10s, stringify is too expensive to run every .5s in liq
+            else lastSave = new Date();
+        }
+        localStorage.setItem(name, JSON.stringify(data));
     } catch (e) {
         if (e.code == 22) {
             // Storage full, maybe notify user or do some clean-up
@@ -20,6 +24,7 @@ function debug(message, type, lootIcon) {
 var MODULES = {}
 // Above code should be in GraphsOnly.js, is here only only for ease of local testing
 
+var lastSave = new Date()
 
 var GRAPHSETTINGS = {
     universeSelection: 1,
@@ -30,7 +35,7 @@ var GRAPHSETTINGS = {
 
 function saveSetting(key, value) {
     if (key !== null && value !== null) GRAPHSETTINGS[key] = value;
-    safeSetItems("GRAPHSETTINGS", JSON.stringify(GRAPHSETTINGS));
+    safeSetItems("GRAPHSETTINGS", GRAPHSETTINGS);
 }
 
 var chart1;
@@ -129,7 +134,7 @@ function init() {
 
 // 
 function Graph(dataVar, universe, selectorText, additionalParams = {}) {
-    // graphTitle, customFunction, useAccumulator, xTitle, yTitle, formatter, valueSuffix, xminFloor, yminFloor, yType
+    // graphTitle, customFunction, useAccumulator, xTitle, yTitle, formatter, xminFloor, yminFloor, yType
     this.dataVar = dataVar
     this.universe = universe; // false, 1, 2
     this.selectorText = selectorText ? selectorText : dataVar;
@@ -140,7 +145,6 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
     this.xTitle = "Zone";
     this.yTitle = this.selectorText;
     this.formatter;
-    this.valueSuffix = "";
     this.xminFloor = 1;
     this.yminFloor;
     this.yType = "Linear";
@@ -167,6 +171,7 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
                     relativeTo: "chart",
                 },
             },
+            colors: ["#e60049", "#0bb4ff", "#50e991", "#e6d800", "#9b19f5", "#ffa300", "#dc0ab4", "#b3d4ff", "#00bfa0"],
             title: {
                 text: this.graphTitle,
                 x: -20,
@@ -199,16 +204,13 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
                     },
                 ],
                 type: this.yType,
-                dateTimeLabelFormats: {
-                    // TODO write a whole new *duration* formatter instead of a datetime formatter
-                    second: "%H:%M:%S",
-                    minute: "%H:%M:%S",
-                    hour: "%H:%M:%S",
-                    day: "%H:%M:%S",
-                    week: "%H:%M:%S",
-                    month: "%H:%M:%S",
-                    year: "%H:%M:%S",
-                },
+                labels: {
+                    formatter: function () {
+                        // These are Trimps format functions for durations and numbers, respectively
+                        if (this.dateTimeLabelFormat) return formatSecondsAsClock(this.value / 1000)
+                        else return prettify(this.value);
+                    }
+                }
             },
             tooltip: {
                 pointFormatter: this.formatter,
@@ -225,13 +227,12 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
     }
     // Main Graphing function
     this.updateGraph = function () {
-        let valueSuffix = this.valueSuffix;
         if (this.graphType == "line") this.lineGraph();
         if (this.graphType == "column") this.columnGraph();
         this.formatter = this.formatter
             || function () {
                 var ser = this.series; // 'this' being the highcharts object that uses formatter()
-                return '<span style="color:' + ser.color + '" >●</span> ' + ser.name + ": <b>" + prettify(this.y) + valueSuffix + "</b><br>";
+                return '<span style="color:' + ser.color + '" >●</span> ' + ser.name + ": <b>" + prettify(this.y) + "</b><br>";
             };
         chart1 = new Highcharts.Chart(this.createHighChartsObj());
         saveSelectedGraphs();
@@ -269,9 +270,11 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
         this.xTitle = "Portal"
         this.graphData = [];
         let cleanData = []
-        // TODO test for datavar in portal, or in perZoneData, if you ever want to make column graphs based on max(perZoneData)
+        // future use: test for datavar in portal, or in perZoneData, if you ever want to make column graphs based on max(perZoneData)
         for (const portal of Object.values(portalSaveData)) {
-            cleanData.push([portal.totalPortals, portal[item]])
+            if (portal.universe == GRAPHSETTINGS.universeSelection) {
+                cleanData.push([portal.totalPortals, portal[item]])
+            }
         }
         this.graphData.push({
             name: this.yTitle,
@@ -303,6 +306,7 @@ function drawGraph() {
     if (selectedGraph.value) {
         lookupGraph(selectedGraph.value).updateGraph();
     }
+    showHideUnusedGraphs();
 }
 
 // Custom Function Helpers
@@ -332,7 +336,6 @@ function pctOfInitial(dataVar, initial) {
 }
 
 var formatters = {
-    // TODO look up how to change the formatting based on the total duration
     datetime: function () {
         var ser = this.series;
         return '<span style="color:' + ser.color + '" >●</span> ' + ser.name + ": <b>" + Highcharts.dateFormat("%H:%M:%S", this.y) + "</b><br>";
@@ -349,7 +352,7 @@ var formatters = {
 */
 
 // Graph(dataVar, universe, selectorText, additionalParams) {
-// graphTitle, customFunction, useAccumulator, xTitle, yTitle, formatter, valueSuffix, xminFloor, yminFloor, yType
+// graphTitle, customFunction, useAccumulator, xTitle, yTitle, formatter, xminFloor, yminFloor, yType
 const graphList = [
     // U1 Graphs
     ["heliumOwned", 1, "Helium - He/Hr", {
@@ -363,11 +366,11 @@ const graphList = [
         customFunction: (portal, i) => { return pctOfInitial("heliumOwned", portal.totalHelium)(portal, i) }
     }],
     ["fluffy", 1, "Fluffy XP", {
-        conditional: () => { return game.global.highestLevelCleared >= 300 },
+        conditional: () => { return getGameData.u1hze() >= 300 && getGameData.fluffy() < 3415819248011889 }, // pre unlock, post E10L10
         customFunction: (portal, i) => { return diff("fluffy", portal.initialFluffy)(portal, i) }
     }],
     ["fluffy", 1, "Fluffy XP PerHour", {
-        conditional: () => { return game.global.highestLevelCleared >= 300 },
+        conditional: () => { return getGameData.u1hze() >= 300 && getGameData.fluffy() < 3415819248011889 },
         customFunction: (portal, i) => { return diff("fluffy", portal.initialFluffy)(portal, i) / elapsedHours(portal, i) }
     }],
     ["amals", 1, "Amalgamators"],
@@ -397,7 +400,7 @@ const graphList = [
         customFunction: (portal, i) => { return diff("scruffy", portal.initialScruffy)(portal, i) / elapsedHours(portal, i) }
     }],
     ["worshippers", 2, "Worshippers", {
-        conditional: () => { return game.global.highestRadonLevelCleared >= 50 }
+        conditional: () => { return getGameData.u2hze() >= 50 }
     }],
     ["bonfires", 2, "Bonfires", {
         graphTitle: "Active Bonfires",
@@ -427,7 +430,13 @@ const graphList = [
         portalVar: "totalNullifium",
         graphType: "column",
     }],
-    ["overkill", false, "Overkill Cells"],
+    ["overkill", false, "Overkill Cells", {
+        // Overkill unlock zones (roughly)
+        conditional: () => {
+            return ((getGameData.universe() == 1 && getGameData.u1hze >= 170)
+                || getGameData.universe() == 2 && getGameData.u2hze >= 201)
+        }
+    }],
     ["currentTime", false, "Clear Time", {
         customFunction: (portal, i) => { return Math.round(diff("currentTime")(portal, i)) },
         yType: "datetime",
@@ -481,6 +490,8 @@ const getGameData = {
     universe: () => { return game.global.universe },
     portalTime: () => { return game.global.portalTime },
     s3: () => { return game.global.lastRadonPortal },
+    u1hze: () => { return game.global.highestLevelCleared },
+    u2hze: () => { return game.global.highestRadonLevelCleared },
 }
 
 function Portal() {
@@ -503,7 +514,7 @@ function Portal() {
     }
     this.perZoneData = Object.fromEntries(graphList.filter((graph) =>
         (graph.universe == this.universe || !graph.universe) // only save data relevant to the current universe
-        && graph.conditional()) // and for relevant challenges
+        && graph.conditional() && graph.dataVar) // and for relevant challenges, with datavars 
         .map(graph => [graph.dataVar, []]) // create data structure
         .concat([["currentTime", []]]) // always graph time
     );
@@ -629,7 +640,6 @@ document.addEventListener(
 );
 
 // Up to date (ish)
-// TODO the game thinks a portal starts on the portal screen when you swap universes, instead of when you start a portal.  Urk.
 function pushData() {
     debug("Starting Zone " + getGameData.world(), "graphs");
     const portalID = `u${getGameData.universe()} p${getTotalPortals(true)}`
@@ -638,42 +648,27 @@ function pushData() {
     }
     portalSaveData[portalID].update();
     //clearData(10); // TODO this value should be different now wheee
-    safeSetItems("portalSaveData", JSON.stringify(portalSaveData));
-    showHideUnusedGraphs();
+    safeSetItems("portalSaveData", portalSaveData);
 }
 
+// Hide graphs that have no collected data
 function showHideUnusedGraphs() {
-    // Hide graphs that have no collected data
     for (const graph of graphList) {
-        // TODO this seems excessive, there is almost certainly a cheaper way to check this.
-        if (graph.graphType == "line") graph.lineGraph();
-        else graph.columnGraph();
-
-        let graphData = graph.graphData
-        const style = graphData.length === 0 ? "none" : "";
+        let style = "none"
+        if (!(graph.graphType == "line")) continue;
         const universes = graph.universe ? [graph.universe] : ["1", "2"]
         for (const universe of universes) {
+            for (portal of Object.values(portalSaveData)) {
+                if (portal.perZoneData[graph.dataVar] && portal.universe == universe  // has collected data, in the right universe
+                    && portal.perZoneData[graph.dataVar].some((z) => { return !(z === 0 || z === null) })) { // and there is nonzero data
+                    style = ""
+                    break;
+                }
+            }
             document.querySelector(`#u${universe}graphSelection [value="${graph.selectorText}"]`).style.display = style;
         }
     }
     return
-    // TODO Hide specific graphs that are constant (either not unlocked yet, or maxed)
-    const emptyGraphs = {
-        OverkillCells: { dataName: "overkill" },
-        Worshippers: { universe: "u2" },
-        "Fluffy XP": { dataName: "fluffy", universe: "u1" },
-        "Fluffy XP PerHour": { dataName: "fluffy", universe: "u1" },
-        Amalgamators: { dataName: "amals", universe: "u1" },
-        Empower: {},
-    }
-    for (const [graphName, data] of Object.entries(emptyGraphs)) {
-        const dataName = data.dataName ? data.dataName : graphName.toLowerCase();
-        const universes = data.universe ? [data.universe] : ["u1", "u2"]
-        for (universe of universes) {
-            const style = [...new Set(allSaveData.map((graphs) => graphs = graphs[dataName]))].length == 1 ? "none" : "";
-            document.querySelector(`#${universe}graphSelection [value="${graphName}"]`).style.display = style;
-        }
-    }
 }
 
 function initializeData() {
@@ -708,8 +703,18 @@ function loadGraphData() {
 var portalSaveData = {}
 loadGraphData();
 init()
-//showHideUnusedGraphs()
+showHideUnusedGraphs()
 var lastTheme = -1;
 
-// TODO put this in a Proxy/wrapper instead of a setInterval to avoid all the 'too slow' data errors
-setInterval(gatherInfo, 100);
+
+// Wrap the Trimps function for transitioning zones to avoid data loss
+var originalnextWorld = nextWorld;
+nextWorld = function () {
+    try {
+        gatherInfo()
+    }
+    catch (e) {
+        debug("Gather info failed: " + e)
+    }
+    originalnextWorld(...arguments);
+}
