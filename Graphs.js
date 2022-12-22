@@ -256,11 +256,12 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
     chart1 = new Highcharts.Chart(this.createHighChartsObj());
     applyRememberedSelections();
   }
-  // prepares data series for Highcharts, and optionally transforms it with customFunction and/or useAccumulator
+  // prepares data series for Highcharts, and optionally transforms it with toggled options, customFunction and/or useAccumulator
   this.lineGraph = function () {
     var item = this.dataVar;
     this.graphData = [];
     this.graphTitle = this.baseGraphTitle;
+    var maxS3 = Math.max(...Object.values(portalSaveData).map((portal) => portal.s3).filter((s3) => s3));
     if (this.toggles) {
       // create save space for the toggles if they don't exist
       if (GRAPHSETTINGS.toggles[this.selectorText] === undefined) { GRAPHSETTINGS.toggles[this.selectorText] = {} }
@@ -270,7 +271,7 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
       // change the graph title per toggle
       if (GRAPHSETTINGS.toggles[this.selectorText].perHr) { this.graphTitle += " / Hour" }
       if (GRAPHSETTINGS.toggles[this.selectorText].lifetime) { this.graphTitle += " % of Lifetime Total" }
-      if (GRAPHSETTINGS.toggles[this.selectorText].s3normalized) { this.graphTitle += ", Normalized to 0 S3" }
+      if (GRAPHSETTINGS.toggles[this.selectorText].s3normalized) { this.graphTitle += `, Normalized to z${maxS3} S3` }
     }
     // parse data per portal
     for (const portal of Object.values(portalSaveData)) {
@@ -292,7 +293,6 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
             if (!bool) continue;
             switch (toggle) {
               case "perHr": {
-                // TODO do we need a null check here?
                 x = x / ((time - portal.portalTime) / 3600000)
                 break;
               }
@@ -308,7 +308,7 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
                 break
               }
               case "s3normalized": {
-                x = x / portal.s3
+                x = x / 1.03 ** portal.s3 * 1.03 ** maxS3
                 break;
               }
             }
@@ -405,7 +405,7 @@ function drawGraph() {
     container.appendChild(label)
     return container;
   }
-
+  pushData(); // update current zone data on request
   let universe = GRAPHSETTINGS.universeSelection;
   let selectedGraph = document.getElementById(`u${universe}graphSelection`);
   if (selectedGraph.value) {
@@ -825,4 +825,14 @@ nextWorld = function () {
   originalnextWorld(...arguments);
 }
 
-// TODO wrap the Portal function and call pushData() to update stats on portal to capture daily bonuses, voids on last zone, etc
+// Wrap portal function to update on end of run
+var originalactivatePortal = activatePortal;
+activatePortal = function () {
+  try {
+    pushData();
+  }
+  catch (e) {
+    debug("Gather info failed: " + e)
+  }
+  originalactivatePortal(...arguments)
+}
