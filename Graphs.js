@@ -31,32 +31,13 @@ function safeLocalStorage(name, data) {
 function savePortalData(saveAll = true) {
   var currentPortal = getportalID();
   if (saveAll) {
-    try {
-      if (typeof window.Worker === 'function') {
-        worker = new Worker(basepath + "compress.js");
-        worker.onmessage = recievedCompressedSave;
-        worker.postMessage(JSON.stringify(portalSaveData))
-      }
-      else {
-        console.debug("Fallback to non-webworker")
-        safeLocalStorage("portalDataHistory", LZString.compressToBase64(JSON.stringify(portalSaveData)))
-      }
-    }
-    catch (e) {
-      console.debug("Error saving graph history", e.code, e)
-    }
+    safeLocalStorage("portalDataHistory", LZString.compressToBase64(JSON.stringify(portalSaveData)))
   }
   else {
     var portalObj = {}
     portalObj[currentPortal] = portalSaveData[currentPortal];
     safeLocalStorage("portalDataCurrent", portalObj)
   }
-}
-
-function recievedCompressedSave(event) {
-  var saveString = event.data;
-  safeLocalStorage("portalDataHistory", saveString)
-  console.debug("Successfully used a webworker to save graph data")
 }
 
 // Save settings, with or without updating a key
