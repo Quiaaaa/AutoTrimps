@@ -821,7 +821,12 @@ function Portal() {
         data[world] = Math.max(getGameData[name](), data[world] || 0);
         continue;
       }
-      data[world] = getGameData[name]();
+      try {
+        data[world] = getGameData[name]();
+      }
+      catch {
+        console.debug("Unknown data type:", name)
+      }
     }
   }
 }
