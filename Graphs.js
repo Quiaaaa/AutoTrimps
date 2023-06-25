@@ -217,10 +217,13 @@ function last(arr) {
 function createUI() {
   var head = document.getElementsByTagName("head")[0]
 
-  var chartscript = document.createElement("script");
-  chartscript.type = "text/javascript";
-  chartscript.src = "https://code.highcharts.com/highcharts.js";
-  head.appendChild(chartscript);
+  for (const source of ["https://code.highcharts.com/highcharts.js", "https://code.highcharts.com/modules/boost.js"]) {
+    var chartscript = document.createElement("script");
+    chartscript.type = "text/javascript";
+    chartscript.src = source
+    head.appendChild(chartscript);
+  }
+
 
   var graphsButton = document.createElement("TD");
   graphsButton.appendChild(document.createTextNode("Graphs"))
@@ -426,6 +429,7 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
         renderTo: "graph",
         zoomType: "xy",
         animation: false,
+        shadow: false,
         resetZoomButton: {
           position: {
             align: "right",
@@ -443,6 +447,11 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
         style: {
           fontSize: '2rem'
         }
+      },
+      boost: {
+        useGPUTranslations: true,
+        // Chart-level boost when there are more than 5 series in the chart
+        seriesThreshold: 101
       },
       plotOptions: {
         series: {
@@ -493,6 +502,8 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
         maxPadding: .05,
       },
       tooltip: {
+        animation: false,
+        shadow: false,
         pointFormatter: this.formatter,
         style: {
           fontSize: "1.2rem"
