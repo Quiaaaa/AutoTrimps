@@ -760,8 +760,9 @@ function applyRememberedSelections() {
     GRAPHSETTINGS.rememberSelected = [] // if the graphlist changes, order is no longer guaranteed
   }
   for (var i = 0; i < chart1.series.length; i++) {
-    if (GRAPHSETTINGS.rememberSelected[i] === false) { chart1.series[i].hide(); }
+    if (GRAPHSETTINGS.rememberSelected[i] === false) { chart1.series[i].setVisible(false, false); }
   }
+  chart1.redraw()
 }
 function toggleSpecificGraphs() {
   for (const chart of chart1.series) {
@@ -773,8 +774,9 @@ function toggleAllGraphs() {
   var visCount = 0;
   chart1.series.forEach(chart => visCount += chart.visible)
   for (const chart of chart1.series) {
-    visCount > chart1.series.length / 2 ? chart.hide() : chart.show();
+    visCount > chart1.series.length / 2 ? chart.setVisible(false, false) : chart.setVisible(true, false);
   }
+  chart1.redraw()
 }
 
 // --------- Portal and Game data handling ---------
