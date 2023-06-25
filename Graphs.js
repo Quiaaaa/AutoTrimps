@@ -1133,7 +1133,7 @@ const toggledGraphs = {
         x = ((newBonus - totalBonus) / (totalBonus ? totalBonus : 1));
       }
       else { x = x / (initial ? initial : 1) }
-      return x;
+      return x * 100;
     }
   },
   s3normalized: {
