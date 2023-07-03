@@ -595,6 +595,7 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
   this.columnGraph = function () {
     var highChartsObj = this.createHighChartsObj() // make default object, to be customized as needed
     highChartsObj.xAxis.title.text = "Portal"
+    highChartsObj.xAxis.floor = 0;
     highChartsObj.plotOptions.series = { groupPadding: .2, pointPadding: 0, animation: false, borderColor: "black" }
     // set up axes for each column so they scale independently
     var activeColumns = this.columns.filter(column => !(column.universe && column.universe != GRAPHSETTINGS.universeSelection));
