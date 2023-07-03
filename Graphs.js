@@ -217,6 +217,7 @@ function last(arr) {
 function createUI() {
   var head = document.getElementsByTagName("head")[0]
 
+
   for (const source of ["https://code.highcharts.com/highcharts.js", "https://code.highcharts.com/modules/boost.js"]) {
     var chartscript = document.createElement("script");
     chartscript.type = "text/javascript";
@@ -601,12 +602,12 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
       toggledGraphs.perHr.graphMods(false, highChartsObj)
       activeColumns = activeColumns.filter(column => column.dataVar !== "currentTime")
     }
-    // all of the yaxes showing is just visual noise, all invisible hurts me, but I have no good alternatives
-    var axes = activeColumns.map(column => { return { visible: false, endOnTick: false } });
-
     this.graphData = [];
     var yAxis = 0;
+    var displayedColumns = [];
+    // TODO BUG the 0th portal is not displayed for whatever reason, google pulls up a lot of weirdness on highcharts
     for (const column of activeColumns) {
+      var hasData = false;
       var cleanData = []
       var currUniPortals = Object.values(portalSaveData).filter(portal => portal.universe == GRAPHSETTINGS.universeSelection);
       for (const portal of Object.values(currUniPortals).slice(Math.max(Object.values(currUniPortals).length - GRAPHSETTINGS.portalsDisplayed, 0))) {
@@ -622,27 +623,32 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
         if (GRAPHSETTINGS.toggles[this.id].perHr) { // HACKS a headache for future me if other toggles are wanted here.
           data = data / (last(portal.perZoneData.currentTime) / 3600000);
         }
+        if (data) hasData = true
         cleanData.push([portal.totalPortals, data])
       }
-      var series = {
-        name: column.title,
-        data: cleanData,
-        type: "column",
-        yAxis: yAxis,
-        color: column.color,
+      if (hasData) { // only add columns if there is any data in that column over all portals
+        var series = {
+          name: column.title,
+          data: cleanData,
+          type: "column",
+          yAxis: yAxis,
+          color: column.color,
+        }
+        if (column.dataVar === "currentTime") { // HACKS override formatter for time vars
+          series["tooltip"] = { "pointFormatter": formatters.datetime }
+        }
+        this.graphData.push(series);
+        displayedColumns.push(column)
+        yAxis += 1;
       }
-      if (column.dataVar === "currentTime") { // HACKS override formatter for time vars
-        series["tooltip"] = { "pointFormatter": formatters.datetime }
-      }
-      this.graphData.push(series);
-      yAxis += 1;
     }
+    // Label the axes
+    var axes = displayedColumns.map(column => { return { visible: false, endOnTick: false } });
     // reduce padding between portals as portals increase
     highChartsObj.plotOptions.series["groupPadding"] = .5 / this.graphData[0].data.length ** .6;
     if (this.graphData[0].data.length > 15) {
       highChartsObj.plotOptions.series["borderWidth"] = 0.1;
     }
-
     highChartsObj.yAxis = axes;
     highChartsObj.series = this.graphData;
     return highChartsObj;
