@@ -131,6 +131,74 @@ function loadGraphData() {
   MODULES.graphs.useDarkAlways = false
 }
 
+function importGraphs() {
+  var exportArea = document.getElementById("exportArea")
+  var data = exportArea.value;
+  var currentdata = localStorage.portalDataHistory; // make a backup
+
+  localStorage.portalDataHistory = data;
+  try {
+    loadGraphData();
+  }
+  catch (e) {
+    exportArea.innerHTML = "Error loading graph data, are you sure that was what you wanted to paste?"
+    console.log(e)
+    localStorage.portalDataHistory = currentdata
+    loadGraphData()
+  }
+}
+
+function importExportGraphsDialog() {
+  escapeATWindows(true) // close graphs... rendering graphs while also having up to 5MB of text on display is a bad time.
+  // Code shamelessly lifted from the main game. How much of this is needed?  I'm not going to find out. 
+  if (game.global.lockTooltip && event != 'update') return;
+  if (game.global.lockTooltip && isItIn && event == 'update') return;
+  var elem = document.getElementById("tooltipDiv");
+  swapClass("tooltipExtra", "tooltipExtraNone", elem);
+  document.getElementById('tipText').className = "";
+  var ondisplay = null; // if non-null, called after the tooltip is displayed
+  openTooltip = null;
+
+  var saveText = localStorage.portalDataHistory
+  var buttonHTML;
+  var downloadBlob;
+  if (Blob !== null) {
+    var blob = new Blob([saveText], { type: 'text/plain' });
+    var uri = URL.createObjectURL(blob);
+    downloadBlob = uri;
+  } else {
+    downloadBlob = 'data:text/plain,' + encodeURIComponent(saveText);
+  }
+  var saveName = `Trimps Graphs ${Object.keys(portalSaveData)[0]} - ${last(Object.keys(portalSaveData))}`;
+  tooltipText = "This is your graph data. To Import, paste your data here and then click import.  If you did that and then realized you actually wanted to export, re-open this dialog and then don't do it in that order again. <br/><br/><textarea spellcheck='false' id='exportArea' style='width: 100%' rows='5'>" + saveText + "</textarea>";
+  buttonHTML = "<div class='maxCenter'><div id='confirmTooltipBtn' class='btn btn-info' onclick='cancelTooltip()'>Got it</div> ";
+  if (document.queryCommandSupported('copy')) {
+    buttonHTML += "<div id='clipBoardBtn' class='btn btn-success'>Export</div>";
+  }
+  buttonHTML += `
+    <div id='importBtn' class='btn btn-success' onclick='importGraphs()'>Import</div>
+    <a id='downloadLink' target='_blank' download="${saveName}"'.txt', href=${downloadBlob}>
+    <div class='btn btn-danger' id='downloadBtn'>Download as File</div></a>
+    </div>`;
+
+  ondisplay = tooltips.handleCopyButton();
+  game.global.lockTooltip = true;
+  elem.style.left = "33.75%";
+  elem.style.top = "25%";
+
+  var titleText;
+  titleText = "Import/Export Graph Data"
+  lastTooltipTitle = titleText;
+  tip2 = ""
+  var tipNum = (tip2) ? "2" : "";
+  document.getElementById("tipTitle" + tipNum).innerHTML = titleText;
+  document.getElementById("tipText" + tipNum).innerHTML = tooltipText;
+  document.getElementById("tipCost" + tipNum).innerHTML = buttonHTML;
+  elem.style.display = "block";
+  if (ondisplay !== null)
+    ondisplay();
+}
+
 function clearData(keepN, clrall = false) {
   // TODO it is awkward as fuck that this works on portal number, when IDs are universe + portal number.  
   // Fixing that would remove a lot of ugliness here and in deleteSpecific.
@@ -278,7 +346,9 @@ function createUI() {
     <div style="flex:0 2 3.5vw;"><input style="width:100%;min-width: 40px;" id="deleteSpecificTextBox"></div>
     <div style="flex:auto; margin-left: 0.5vw;"><button id="deleteSpecificBtn" onclick="deleteSpecific(); drawGraph();">Delete Specific U1 Portal</button></div>
     <div style="float:right; margin-right: 0.5vw;"><button onclick="toggleSpecificGraphs()">Invert Selection</button></div>
-    <div style="float:right; margin-right: 1vw;"><button onclick="toggleAllGraphs()">All Off/On</button></div>`
+    <div style="float:right; margin-right: 1vw;"><button onclick="toggleAllGraphs()">All Off/On</button></div>
+    <button onclick="importExportGraphsDialog()">Import/Export</button>`
+
 
   // AAAAAAAAAAAAAAAAAAAAAAAAAAAA (Setting the inner HTML of the parent element resets the value of these? what the fuck)
   // default to Current Universe + Clear Time if no user data exists
@@ -294,6 +364,7 @@ function createUI() {
     <span style="float: left; margin-left: 2vw">Saved Portals: <input style="width:40px;" id="portalsSavedTextBox" onchange="saveSetting('maxGraphs', this.value); clearData(this.value); updateGraph();"></span>
     <input onclick="toggleDarkGraphs()" style="height: 20px; float: right; margin-right: 0.5vw;" type="checkbox" id="blackCB">
     <span style="float: right; margin-right: 0.5vw;">Black Graphs:</span>
+    
     `;
 
   // Add a header with negative float hanging down on the top of the graph, for toggle buttons
@@ -396,6 +467,8 @@ document.addEventListener(
   },
   true
 );
+
+
 
 // --------- Graph handling ---------
 
@@ -606,7 +679,6 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
     this.graphData = [];
     var yAxis = 0;
     var displayedColumns = [];
-    // TODO BUG the 0th portal is not displayed for whatever reason, google pulls up a lot of weirdness on highcharts
     for (const column of activeColumns) {
       var hasData = false;
       var cleanData = []
