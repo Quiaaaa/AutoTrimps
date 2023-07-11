@@ -132,11 +132,12 @@ function loadGraphData() {
 }
 
 function importGraphs() {
+  var currentdata = localStorage.portalDataHistory; // make a backup
+  // get user input and put it in localstorage
   var exportArea = document.getElementById("exportArea")
   var data = exportArea.value;
-  var currentdata = localStorage.portalDataHistory; // make a backup
-
   localStorage.portalDataHistory = data;
+  portalSaveData = {} // wipe old data
   try {
     loadGraphData();
   }
@@ -364,7 +365,6 @@ function createUI() {
     <span style="float: left; margin-left: 2vw">Saved Portals: <input style="width:40px;" id="portalsSavedTextBox" onchange="saveSetting('maxGraphs', this.value); clearData(this.value); updateGraph();"></span>
     <input onclick="toggleDarkGraphs()" style="height: 20px; float: right; margin-right: 0.5vw;" type="checkbox" id="blackCB">
     <span style="float: right; margin-right: 0.5vw;">Black Graphs:</span>
-    
     `;
 
   // Add a header with negative float hanging down on the top of the graph, for toggle buttons
@@ -467,8 +467,6 @@ document.addEventListener(
   },
   true
 );
-
-
 
 // --------- Graph handling ---------
 
@@ -803,7 +801,7 @@ function showHideUnusedGraphs() {
       var style = "none"
       for (portal of Object.values(portalSaveData)) {
         if (portal.perZoneData[graph.dataVar] && portal.universe === universe  // has collected data, in the right universe
-          && new Set(portal.perZoneData[graph.dataVar].filter(x => x)).size > 1) { // and there is nonzero, variable data
+          && new Set(portal.perZoneData[graph.dataVar].filter(x => x === 0 || x)).size > 1) { // and there is nonzero, variable data
           style = ""
           if (!activeUniverses.includes(universe)) activeUniverses.push(universe);
           break;
