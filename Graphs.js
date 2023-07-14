@@ -291,6 +291,7 @@ function createUI() {
     var chartscript = document.createElement("script");
     chartscript.type = "text/javascript";
     chartscript.src = source
+    chartscript.async = false
     head.appendChild(chartscript);
   }
 
