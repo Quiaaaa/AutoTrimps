@@ -16,13 +16,15 @@ function safeLocalStorage(name, data) {
     if (typeof data != "string") data = JSON.stringify(data);
     localStorage.setItem(name, data);
   } catch (e) {
-    if (e.code == 22 || e.code == 1014) { // 
-      // Storage full, delete oldest portal from history, and try again
-      graphsDebug(`Deleting ${Object.keys(portalSaveData)[0]}, out of storage`)
-      delete portalSaveData[Object.keys(portalSaveData)[0]];
-      savePortalData(true);
-      safeLocalStorage(name, data)
-      console.debug("AT Graphs Error: LocalStorage is full. Automatically deleting a graph to clear up space.", e.code, e);
+    if (e.code == 22 || e.code == 1014) { //
+      // Storage full, delete oldest 10 portals from history, and try again
+      console.debug(`Deleting oldest 10 portals ${Object.keys(portalSaveData)[0]} - ${Object.keys(portalSaveData)[10]}`)
+      var delCount = 10;
+      for (var i = 0; i < delCount; i++) {
+        delete portalSaveData[Object.keys(portalSaveData)[i]];
+      }
+      savePortalData(true, true); // force a blocking save
+      console.warn(`Ran out of Local Storage, consider lowering your saved portals to something under ${Object.keys(portalSaveData).length}`);
     }
   }
 }
@@ -35,11 +37,11 @@ var blob = new Blob([`
 var compressionUrl = URL.createObjectURL(blob);
 
 // Save Portal Data to history, or current only
-function savePortalData(saveAll = true) {
+function savePortalData(saveAll = true, forceImmediate) {
   var currentPortal = getportalID();
   if (saveAll) {
     try {
-      if (typeof window.Worker === 'function') {
+      if (typeof window.Worker === 'function' && !forceImmediate) {
         worker = new Worker(compressionUrl);
         worker.onmessage = recievedCompressedSave;
         worker.postMessage(JSON.stringify(portalSaveData))
@@ -943,6 +945,7 @@ const getGameData = {
   currentTime: () => { return getGameTime() - game.global.portalTime }, // portalTime changes on pause, 'when a portal started' is not a static concept
   timeOnMap: () => {
     // TODO this time is wrong if the player sits in map chamber.  Then again, they might want that time included in 'map' time.
+    // TODO BUG this time is also wrong if the player pauses in map chamber, which is actually 100% wrong and should be fixed, somehow
     var annoyingRemainder = 0;
     if (game.global.mapStarted < game.global.zoneStarted) {
       annoyingRemainder = getGameTime() - game.global.mapStarted;
