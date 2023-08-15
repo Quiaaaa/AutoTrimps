@@ -1291,21 +1291,28 @@ activatePortal = function () {
   originalactivatePortal(...arguments)
 }
 
-//On Map start
+// On Map start
+// Capture the time of the previous map, upon creating a new map
 // This unfortunately loses the last map, since we grab map time at the creation of the map
 var originalbuildMapGrid = buildMapGrid;
 buildMapGrid = function () {
-  try { pushData(true); }
+  try {
+    if (game.global.mapsActive) pushData(true);
+  }
   catch (e) { graphsDebug("Gather info failed: " + e) }
   originalbuildMapGrid(...arguments)
 }
 
-//On leaving maps for world
+// On leaving maps for world
 // this captures the last map when you switch away from maps
 var originalmapsSwitch = mapsSwitch;
 mapsSwitch = function () {
   originalmapsSwitch(...arguments)
-  try { if (!game.global.mapsActive) pushData(true); }
+  // yes these are inverted, states are changed before the function is called, whee
+  // arg[0] is used for recycling maps
+  try {
+    if (!game.global.mapsActive && !arguments[0]) pushData(true);
+  }
   catch (e) { graphsDebug("Gather info failed: " + e) }
 }
 
