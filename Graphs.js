@@ -162,6 +162,7 @@ function importExportGraphsDialog() {
   var ondisplay = null; // if non-null, called after the tooltip is displayed
   openTooltip = null;
 
+  savePortalData(true, true); // force save
   var saveText = localStorage.portalDataHistory
   var buttonHTML;
   var downloadBlob;
