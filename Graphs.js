@@ -902,21 +902,11 @@ function Portal() {
       if (world + 1 < data.length) { // FENCEPOSTING (zones are 1 indexed)
         data.splice(world + 1) // trim 'future' zones on reload
       }
-      // TODO move all these weird functions out of here and into their respective wrappers
-      if (name === "timeOnMap") {
-        var timeOnMap = getGameData.timeOnMap();
-        if (fromMap) { data[world] = data[world] + timeOnMap || timeOnMap; } // additive per map within a zone
-        continue;
-      }
-      if (name === "mapCount") {
-        if (fromMap && game.global.mapsActive) { data[world] = data[world] + 1 || 1; } // start at 1 because the hook in is before the map is started/finished
-        continue;
-      }
       if (name === "c23increase") {
         data[world] = Math.max(getGameData[name](), data[world] || 0);
         continue;
       }
-      if (name === "mapHeRn") {
+      if (["mapHeRn", "timeOnMap", "mapCount"].some((n) => n === name)) {
         // These are non-zone dependent and update on their own rules, do not try to process them here
         continue;
       }
@@ -968,16 +958,20 @@ function partialPushData(updates = [[]],) {
   }
 }
 
+function mapUpdate() {
+  partialPushData([
+    ["timeOnMap", getGameData.timeOnMap(), true],
+    ["mapCount", 1, true]])
+}
+
 const getGameData = {
   currentTime: () => { return getGameTime() - game.global.portalTime }, // portalTime changes on pause, 'when a portal started' is not a static concept
   timeOnMap: () => {
-    // TODO this time is wrong if the player sits in map chamber.  Then again, they might want that time included in 'map' time. (this is basically unavoidable, so the player definitely wants that time tracked as map time)
+    // this time is wrong if the player sits in map chamber.  Then again, they might want that time included in 'map' time. (this is basically unavoidable, so the player definitely wants that time tracked as map time)
     // NOT MY BUG The game does not accurately track time on map in timewarp, thus it is impossible to track it in graphs.
-    var annoyingRemainder = 0;
-    if (game.global.mapStarted < game.global.zoneStarted) {
-      annoyingRemainder = getGameTime() - game.global.mapStarted;
-    }
-    return getGameTime() - game.global.mapStarted - annoyingRemainder;
+    // cap the start time to the zone, otherwise the first map gets bogus time due to how Trimps works
+    var start = game.global.mapStarted < game.global.zoneStarted ? game.global.zoneStarted : game.global.mapStarted
+    return getGameTime() - start
   },
   world: () => { return game.global.world },
   challengeActive: () => { return game.global.challengeActive },
@@ -1320,7 +1314,6 @@ createUI()
 showHideUnusedGraphs()
 var lastTheme = -1;
 
-
 // --------- Trimps Wrappers ---------
 
 //On Zone transition
@@ -1348,9 +1341,7 @@ activatePortal = function () {
 // This unfortunately loses the last map, since we grab map time at the creation of the map
 var originalbuildMapGrid = buildMapGrid;
 buildMapGrid = function () {
-  try {
-    if (game.global.mapsActive) pushData(true);
-  }
+  try { mapUpdate(); }
   catch (e) { graphsDebug("Gather info failed: ", e) }
   return originalbuildMapGrid(...arguments)
 }
@@ -1361,9 +1352,10 @@ var originalmapsSwitch = mapsSwitch;
 mapsSwitch = function () {
   var output = originalmapsSwitch(...arguments)
   // yes these are inverted, states are changed before the function is called, whee
-  // arg[0] is used for recycling maps
+  // arg[0] is used for recycling maps (is it though?)
   try {
-    if (!game.global.mapsActive && !arguments[0]) pushData(true);
+    // This is the most cursed hook ever, I swear this was working before with a much simpler check
+    if (!game.global.mapsActive && !game.global.preMapsActive && arguments[0]) mapUpdate();
   }
   catch (e) { graphsDebug("Gather info failed: ", e) }
   return output
