@@ -1,5 +1,5 @@
 // --------- Backend and helpers --------- 
-var enableGraphsDebug = false;
+var enableGraphsDebug = true;
 function graphsDebug(message) {
   if (enableGraphsDebug)
     console.debug(...arguments);
@@ -890,7 +890,7 @@ function Portal() {
     (graph.universe == this.universe || !graph.universe) // only save data relevant to the current universe
     && graph.conditional() && graph.dataVar) // and for relevant challenges, with datavars 
     .map((graph) => graph.dataVar)
-    .concat(["currentTime", "mapCount", "timeOnMap"]); // always graph time vars
+    .concat(["currentTime", "mapCount", "timeOnMap", "mapHeRn"]); // always graph time vars
   perZoneItems.forEach((name) => this.perZoneData[name] = []);
 
   // update per zone data and special totals
@@ -902,6 +902,7 @@ function Portal() {
       if (world + 1 < data.length) { // FENCEPOSTING (zones are 1 indexed)
         data.splice(world + 1) // trim 'future' zones on reload
       }
+      // TODO move all these weird functions out of here and into their respective wrappers
       if (name === "timeOnMap") {
         var timeOnMap = getGameData.timeOnMap();
         if (fromMap) { data[world] = data[world] + timeOnMap || timeOnMap; } // additive per map within a zone
@@ -913,6 +914,10 @@ function Portal() {
       }
       if (name === "c23increase") {
         data[world] = Math.max(getGameData[name](), data[world] || 0);
+        continue;
+      }
+      if (name === "mapHeRn") {
+        // These are non-zone dependent and update on their own rules, do not try to process them here
         continue;
       }
       try {
@@ -936,6 +941,27 @@ function pushData(fromMap) {
     clearData(GRAPHSETTINGS.maxGraphs); // clear out old portals
   }
   portalSaveData[portalID].update(fromMap);
+  savePortalData(false) // save current portal
+  if (GRAPHSETTINGS.live && GRAPHSETTINGS.open) {
+    updateGraph();
+  }
+}
+
+
+// Non-zone trigger updates to data
+function partialPushData(updates = [[]],) {
+  const portalID = getportalID();
+  try {
+    var perZoneData = portalSaveData[portalID].perZoneData;
+    var world = getGameData.world();
+    for (var [name, value, cuum] of updates) {
+      if (cuum) perZoneData[name][world] = value + perZoneData[name][world] || 0;
+      else perZoneData[name][world] = value;
+    }
+  }
+  catch (e) {
+    console.debug("Failed to update: ", updates, e)
+  }
   savePortalData(false) // save current portal
   if (GRAPHSETTINGS.live && GRAPHSETTINGS.open) {
     updateGraph();
@@ -1037,7 +1063,7 @@ const graphList = [
   }),
   // U1 Graphs
   new Graph("heliumOwned", 1, "Helium", {
-    toggles: ["perHr", "perZone", "lifetime"]
+    toggles: ["perHr", "perZone", "lifetime", "world", "map"]
   }),
   new Graph("fluffy", 1, "Fluffy Exp", {
     conditional: () => { return getGameData.u1hze() >= 299 && getGameData.fluffy() < 4266662510275000 }, // pre unlock, post E10L10
@@ -1063,7 +1089,7 @@ const graphList = [
 
   // U2 Graphs
   new Graph("radonOwned", 2, "Radon", {
-    toggles: ["perHr", "perZone", "lifetime", "s3normalized"]
+    toggles: ["perHr", "perZone", "lifetime", "s3normalized", "world", "map"]
   }),
   new Graph("scruffy", 2, "Scruffy Exp", {
     customFunction: (portal, i) => { return diff("scruffy", portal.initialScruffy)(portal, i) },
@@ -1183,10 +1209,11 @@ const toggledGraphs = {
     customFunction: (portal, item, index, x) => {
       // TODO getting moderately ridiculous here on the 'not 0 but falsy' check
       // check for missing data, or start of data
-      if (portal.perZoneData[item][index - 1] !== undefined && portal.perZoneData[item][index - 1] !== null
-        && portal.perZoneData[item][index] !== undefined && portal.perZoneData[item][index] !== null) {
+      if ((portal.perZoneData[item][index - 1] || portal.perZoneData[item][index - 1] === 0)
+        && (portal.perZoneData[item][index] || portal.perZoneData[item][index] === 0)) {
         var x = portal.perZoneData[item][index] - portal.perZoneData[item][index - 1]
-        x = Math.max(0, x) // there should be no values that are negative, outside weird data edge cases that we don't want to display
+        //x = Math.max(0, x) // there should be no values that are negative, outside weird data edge cases that we don't want to display
+        // commenting this out might be a very bad idea, but, it is wrong in some cases.
         var time = portal.perZoneData.currentTime[index] - portal.perZoneData.currentTime[index - 1]
       }
       else {
@@ -1241,6 +1268,30 @@ const toggledGraphs = {
       return x;
     }
   },
+  world: {
+    exclude: ["map"],
+    graphMods: (graph, highChartsObj) => {
+      highChartsObj.title.text += `, World Only`;
+      graph.useAccumulator = true // TODO these accumulators break on perZone and perHr toggles
+    },
+    customFunction: (portal, item, index, x) => {
+      try { var maps = portal.perZoneData.mapHeRn[index] || 0 }
+      catch { }
+      return x - maps - portal.perZoneData[item][index - 1] || 0;
+    }
+  },
+  map: {
+    exclude: ["world"],
+    graphMods: (graph, highChartsObj) => {
+      highChartsObj.title.text += `, Map Only`;
+      graph.useAccumulator = true;
+    },
+    customFunction: (portal, item, index) => {
+      try { var maps = portal.perZoneData.mapHeRn[index] || 0 }
+      catch { }
+      return maps
+    }
+  },
 }
 
 
@@ -1280,16 +1331,16 @@ nextWorld = function () {
     if (null === portalSaveData) portalSaveData = {};
     if (getGameData.world()) { pushData(); }
   }
-  catch (e) { graphsDebug("Gather info failed: " + e) }
-  originalnextWorld(...arguments);
+  catch (e) { graphsDebug("Gather info failed: ", e) }
+  return originalnextWorld(...arguments);
 }
 
 //On Portal
 var originalactivatePortal = activatePortal;
 activatePortal = function () {
   try { pushData(); }
-  catch (e) { graphsDebug("Gather info failed: " + e) }
-  originalactivatePortal(...arguments)
+  catch (e) { graphsDebug("Gather info failed: ", e) }
+  return originalactivatePortal(...arguments)
 }
 
 // On Map start
@@ -1300,21 +1351,22 @@ buildMapGrid = function () {
   try {
     if (game.global.mapsActive) pushData(true);
   }
-  catch (e) { graphsDebug("Gather info failed: " + e) }
-  originalbuildMapGrid(...arguments)
+  catch (e) { graphsDebug("Gather info failed: ", e) }
+  return originalbuildMapGrid(...arguments)
 }
 
 // On leaving maps for world
 // this captures the last map when you switch away from maps
 var originalmapsSwitch = mapsSwitch;
 mapsSwitch = function () {
-  originalmapsSwitch(...arguments)
+  var output = originalmapsSwitch(...arguments)
   // yes these are inverted, states are changed before the function is called, whee
   // arg[0] is used for recycling maps
   try {
     if (!game.global.mapsActive && !arguments[0]) pushData(true);
   }
-  catch (e) { graphsDebug("Gather info failed: " + e) }
+  catch (e) { graphsDebug("Gather info failed: ", e) }
+  return output
 }
 
 // On finishing challenges (for c2s)
@@ -1323,6 +1375,27 @@ abandonChallenge = function () {
   try {
     pushData(true);
   }
-  catch (e) { graphsDebug("Gather info failed: " + e) }
-  originalabandonChallenge(...arguments)
+  catch (e) { graphsDebug("Gather info failed: ", e) }
+  return originalabandonChallenge(...arguments)
+}
+
+// collect map helium data
+var originalrewardResource = rewardResource;
+rewardResource = function () {
+  if (arguments[0] === "helium" && game.global.mapsActive) {
+    try {
+      var initial = getGameData.heliumOwned() || getGameData.radonOwned();
+    }
+    catch (e) { graphsDebug("Gather info failed: Cthulimp: ", e) }
+  }
+  var output = originalrewardResource(...arguments) // always call the original function
+  if (arguments[0] === "helium" && game.global.mapsActive) {
+    try {
+      var final = getGameData.heliumOwned() || getGameData.radonOwned();
+      var gas = getGameData.heliumOwned() ? "heliumOwned" : "radonOwned";
+      partialPushData([["mapHeRn", final - initial, true], [gas, final, false]]) // update both map He and total He
+    }
+    catch (e) { graphsDebug("Gather info failed: Cthulimp: ", e) }
+  }
+  return output
 }
