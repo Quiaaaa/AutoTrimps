@@ -1176,7 +1176,7 @@ const toggledGraphs = {
     dataVars: ["mapCount"],
     exclude: ["mapTime", "mapPct"],
     graphMods: (graph, highChartsObj) => {
-      highChartsObj.tooltip = { pointFormatter: formatters.defaultPoint };
+      highChartsObj.tooltip.pointFormatter = formatters.defaultPoint;
       highChartsObj.yAxis.type = "Linear";
       highChartsObj.title.text = "Maps Run"
       highChartsObj.yAxis.title.text = "Maps Run"
