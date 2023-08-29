@@ -623,13 +623,19 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
       activeToggles = Object.keys(toggledGraphs).filter(toggle => GRAPHSETTINGS.toggles[this.id][toggle])
       activeToggles.forEach(toggle => toggledGraphs[toggle].graphMods(this, highChartsObj)); // 
     }
-    // parse data per portal
+    // get data vars from toggles, replace primary if only one exists
+    var activeDataVars = []
+    activeToggles.forEach(toggle => { if (toggledGraphs[toggle].dataVars) activeDataVars.push(toggledGraphs[toggle].dataVars) });
+    if (activeDataVars === []) { activeDataVars = [item]; }
+    else if (activeDataVars.length == 1) { item = activeDataVars[0] } // replace main data var
     var portalCount = 0;
+    // parse data per portal
     for (const portal of Object.values(portalSaveData).reverse()) {
-      if (!(item in portal.perZoneData)) continue; // ignore blank
+      if (!activeDataVars.every(dvar => dvar in portal.perZoneData)) continue; // ignore blank
       if (portal.universe != GRAPHSETTINGS.universeSelection) continue; // ignore inactive universe
       var cleanData = [];
       // parse the requested datavar
+      var xprev = 0;
       for (const index in portal.perZoneData[item]) {
         var x = portal.perZoneData[item][index];
         var time = portal.perZoneData.currentTime[index];
@@ -638,17 +644,25 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
           if (x < 0) x = null;
         }
         // TOGGLES
-        if (activeToggles.includes("perZone")) {  // must always be first 
-          [x, time] = toggledGraphs.perZone.customFunction(portal, item, index, x);
-        }
-        for (toggle of activeToggles.filter(x => x != "perZone")) {
-          try { x = toggledGraphs[toggle].customFunction(portal, item, index, x, time, maxS3); }
+        // handle toggles that replace whole data vars first
+        for (var toggle of activeToggles) {
+          if (["perZone", "perHr"].includes(toggle)) continue;
+          try { x = toggledGraphs[toggle].customFunction(portal, item, index, x, time, maxS3, xprev); }
           catch (e) {
             x = 0;
             graphsDebug(`Error graphing data on: ${item} ${toggle}, ${e.message}`)
           }
         }
-        if (this.useAccumulator) { x += last(cleanData) !== undefined ? last(cleanData)[1] : 0; }
+        // handle special time and X modifying toggles
+        originalx = x // save before modifiers for perZone use
+        if (activeToggles.includes("perZone")) {  // must always be first 
+          [x, time] = toggledGraphs.perZone.customFunction(portal, item, index, x, false, false, xprev);
+        }
+        if (activeToggles.includes("perHr")) {  // must always be first 
+          x = toggledGraphs.perHr.customFunction(portal, item, index, x, time, maxS3, xprev);
+        }
+        xprev = originalx;
+        //if (this.useAccumulator) { x += last(cleanData) !== undefined ? last(cleanData)[1] : 0; }
         if (this.typeCheck && typeof x != this.typeCheck) x = null;
         cleanData.push([Number(index), x]) // highcharts expects number, number, not str, number
       }
@@ -906,8 +920,9 @@ function Portal() {
         data[world] = Math.max(getGameData[name](), data[world] || 0);
         continue;
       }
-      if (["mapHeRn", "timeOnMap", "mapCount"].some((n) => n === name)) {
-        // These are non-zone dependent and update on their own rules, do not try to process them here
+      // These are non-zone dependent and update on their own rules, but need to be cumulative 
+      if (["mapHeRn", "timeOnMap", "mapCount"].includes(name)) {
+        if (!data[world]) data[world] = data[world - 1] || 0
         continue;
       }
       try {
@@ -944,7 +959,8 @@ function partialPushData(updates = [[]],) {
   try {
     var perZoneData = portalSaveData[portalID].perZoneData;
     var world = getGameData.world();
-    for (var [name, value, cuum] of updates) {
+    for (var [name, value, cuum, accumulator] of updates) {
+      if (!perZoneData[name][world] && accumulator) perZoneData[name][world] += perZoneData[name][world - 1] || 0
       if (cuum) perZoneData[name][world] = value + perZoneData[name][world] || 0;
       else perZoneData[name][world] = value;
     }
@@ -960,8 +976,8 @@ function partialPushData(updates = [[]],) {
 
 function mapUpdate() {
   partialPushData([
-    ["timeOnMap", getGameData.timeOnMap(), true],
-    ["mapCount", 1, true]])
+    ["timeOnMap", getGameData.timeOnMap(), true, true],
+    ["mapCount", 1, true, true]])
 }
 
 const getGameData = {
@@ -1157,13 +1173,13 @@ const graphList = [
 // rules for toggle based graphs
 const toggledGraphs = {
   mapCount: {
+    dataVars: ["mapCount"],
     exclude: ["mapTime", "mapPct"],
     graphMods: (graph, highChartsObj) => {
       highChartsObj.tooltip = { pointFormatter: formatters.defaultPoint };
       highChartsObj.yAxis.type = "Linear";
       highChartsObj.title.text = "Maps Run"
       highChartsObj.yAxis.title.text = "Maps Run"
-      graph.useAccumulator = true;
     },
     customFunction: (portal, item, index, x) => {
       x = portal.perZoneData.mapCount[index] || 0;
@@ -1171,49 +1187,41 @@ const toggledGraphs = {
     }
   },
   mapTime: {
+    dataVars: ["timeOnMap"],
     exclude: ["mapCount", "mapPct"],
     graphMods: (graph, highChartsObj) => {
       highChartsObj.title.text = "Time in Maps";
-      graph.useAccumulator = true;
     },
     customFunction: (portal, item, index, x) => {
       x = portal.perZoneData.timeOnMap[index] || 0;
       return x;
     }
   },
+  /*
   mapPct: { // not used
+    dataVars: ["timeOnMap"],
     exclude: ["mapCount", "mapTime"],
     graphMods: (graph, highChartsObj) => {
       highChartsObj.tooltip = { pointFormatter: formatters.defaultPoint };
       highChartsObj.yAxis.type = "Linear"
       highChartsObj.title.text = "% of Clear time spent Mapping"
       highChartsObj.yAxis.title.text = "% Clear Time"
-      graph.useAccumulator = true;
     },
     customFunction: (portal, item, index, x) => {
       x = portal.perZoneData.timeOnMap[index] / x || 0;
       return x;
     }
   },
+  */
   perZone: {
     graphMods: (graph, highChartsObj) => {
       highChartsObj.title.text += " each Zone"
       graph.useAccumulator = false // HACKS this might be incredibly stupid, find out later when you use this option for a different case!
     },
-    customFunction: (portal, item, index, x) => {
-      // TODO getting moderately ridiculous here on the 'not 0 but falsy' check
-      // check for missing data, or start of data
-      if ((portal.perZoneData[item][index - 1] || portal.perZoneData[item][index - 1] === 0)
-        && (portal.perZoneData[item][index] || portal.perZoneData[item][index] === 0)) {
-        var x = portal.perZoneData[item][index] - portal.perZoneData[item][index - 1]
-        //x = Math.max(0, x) // there should be no values that are negative, outside weird data edge cases that we don't want to display
-        // commenting this out might be a very bad idea, but, it is wrong in some cases.
-        var time = portal.perZoneData.currentTime[index] - portal.perZoneData.currentTime[index - 1]
-      }
-      else {
-        x = 0
-        time = 0
-      }
+    customFunction: (portal, item, index, x, time, maxS3, xprev) => {
+      // default to 0 
+      var x = x - xprev
+      var time = portal.perZoneData.currentTime[index] - portal.perZoneData.currentTime[index - 1]
       return [x, time];
     }
   },
@@ -1221,9 +1229,8 @@ const toggledGraphs = {
     graphMods: (graph, highChartsObj) => {
       highChartsObj.title.text += " / Hour"
     },
-    customFunction: (portal, item, index, x, time) => {
-      if (x) { x = x / (time / 3600000) }
-      return x;
+    customFunction: (portal, item, index, x, time, maxS3, xprev) => {
+      return x / (time / 3600000);
     }
   },
   lifetime: {
@@ -1263,27 +1270,24 @@ const toggledGraphs = {
     }
   },
   world: {
+    dataVars: ["mapHeRn"],
     exclude: ["map"],
     graphMods: (graph, highChartsObj) => {
       highChartsObj.title.text += `, World Only`;
-      graph.useAccumulator = true // TODO these accumulators break on perZone and perHr toggles
     },
     customFunction: (portal, item, index, x) => {
-      try { var maps = portal.perZoneData.mapHeRn[index] || 0 }
-      catch { }
-      return x - maps - portal.perZoneData[item][index - 1] || 0;
+      x = (portal.universe == 1) ? portal.perZoneData.heliumOwned[index] : portal.perZoneData.radonOwned[index]
+      return x - portal.perZoneData.mapHeRn[index] || 0;
     }
   },
   map: {
+    dataVars: ["mapHeRn"],
     exclude: ["world"],
     graphMods: (graph, highChartsObj) => {
       highChartsObj.title.text += `, Map Only`;
-      graph.useAccumulator = true;
     },
-    customFunction: (portal, item, index) => {
-      try { var maps = portal.perZoneData.mapHeRn[index] || 0 }
-      catch { }
-      return maps
+    customFunction: (portal, item, index, x) => {
+      return portal.perZoneData.mapHeRn[index] || 0
     }
   },
 }
@@ -1302,7 +1306,8 @@ var GRAPHSETTINGS = {
   toggles: {},
   darkTheme: true,
   maxGraphs: 60, // Highcharts gets a bit angry rendering more graphs, 30 is the maximum you can fit on the legend before it splits into pages.
-  portalsDisplayed: 30
+  portalsDisplayed: 30,
+  mapsRepaired: false,
 }
 var portalSaveData = {}
 
@@ -1313,6 +1318,7 @@ loadGraphData();
 createUI()
 showHideUnusedGraphs()
 var lastTheme = -1;
+repairMapData() // fix for change in data structure
 
 // --------- Trimps Wrappers ---------
 
@@ -1385,9 +1391,31 @@ rewardResource = function () {
     try {
       var final = getGameData.heliumOwned() || getGameData.radonOwned();
       var gas = getGameData.heliumOwned() ? "heliumOwned" : "radonOwned";
-      partialPushData([["mapHeRn", final - initial, true], [gas, final, false]]) // update both map He and total He
+      partialPushData([["mapHeRn", final - initial, true, true], [gas, final, false, false]]) // update both map He and total He
     }
     catch (e) { graphsDebug("Gather info failed: Cthulimp: ", e) }
   }
   return output
+}
+
+
+// one time fix for a change in how data is saved
+function repairMapData() {
+  if (GRAPHSETTINGS.mapsRepaired) return;
+  for (var [portal, data] of Object.entries(portalSaveData)) {
+    for (dataVar of ["mapCount", "timeOnMap"]) {
+      var firstMap = data.perZoneData[dataVar].findIndex(val => val > 0);
+      var totalData = data.perZoneData[dataVar].filter(x => x > 0).length
+      if (data.perZoneData[dataVar].length > totalData + firstMap && firstMap != -1) {
+      }
+      else { continue; }
+      var cuum = 0
+      for (const [i, value] of data.perZoneData[dataVar].entries()) {
+        cuum += value || 0;
+        portalSaveData[portal].perZoneData[dataVar][i] = cuum
+      }
+    }
+  }
+  saveSetting("mapsRepaired", true)
+  console.log("Mapping data format updated")
 }
