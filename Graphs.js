@@ -627,7 +627,6 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
     var activeDataVars = []
     activeToggles.forEach(toggle => { if (toggledGraphs[toggle].dataVars) activeDataVars.push(toggledGraphs[toggle].dataVars) });
     if (activeDataVars === []) { activeDataVars = [item]; }
-    else if (activeDataVars.length == 1) { item = activeDataVars[0] } // replace main data var
     var portalCount = 0;
     // parse data per portal
     for (const portal of Object.values(portalSaveData).reverse()) {
@@ -1233,6 +1232,27 @@ const toggledGraphs = {
       return x / (time / 3600000);
     }
   },
+  world: {
+    dataVars: ["mapHeRn"],
+    exclude: ["map"],
+    graphMods: (graph, highChartsObj) => {
+      highChartsObj.title.text += `, World Only`;
+    },
+    customFunction: (portal, item, index, x) => {
+      x = (portal.universe == 1) ? portal.perZoneData.heliumOwned[index] : portal.perZoneData.radonOwned[index]
+      return x - portal.perZoneData.mapHeRn[index] || 0;
+    }
+  },
+  map: {
+    dataVars: ["mapHeRn"],
+    exclude: ["world"],
+    graphMods: (graph, highChartsObj) => {
+      highChartsObj.title.text += `, Map Only`;
+    },
+    customFunction: (portal, item, index, x) => {
+      return portal.perZoneData.mapHeRn[index] || 0
+    }
+  },
   lifetime: {
     graphMods: (graph, highChartsObj) => {
       highChartsObj.title.text += " % of Lifetime Total";
@@ -1267,27 +1287,6 @@ const toggledGraphs = {
     customFunction: (portal, item, index, x, time, maxS3) => {
       x = x / 1.03 ** portal.s3 * 1.03 ** maxS3
       return x;
-    }
-  },
-  world: {
-    dataVars: ["mapHeRn"],
-    exclude: ["map"],
-    graphMods: (graph, highChartsObj) => {
-      highChartsObj.title.text += `, World Only`;
-    },
-    customFunction: (portal, item, index, x) => {
-      x = (portal.universe == 1) ? portal.perZoneData.heliumOwned[index] : portal.perZoneData.radonOwned[index]
-      return x - portal.perZoneData.mapHeRn[index] || 0;
-    }
-  },
-  map: {
-    dataVars: ["mapHeRn"],
-    exclude: ["world"],
-    graphMods: (graph, highChartsObj) => {
-      highChartsObj.title.text += `, Map Only`;
-    },
-    customFunction: (portal, item, index, x) => {
-      return portal.perZoneData.mapHeRn[index] || 0
     }
   },
 }
