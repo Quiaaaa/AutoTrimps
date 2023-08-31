@@ -1181,7 +1181,7 @@ const toggledGraphs = {
       highChartsObj.yAxis.title.text = "Maps Run"
     },
     customFunction: (portal, item, index, x) => {
-      x = portal.perZoneData.mapCount[index] || 0;
+      x = portal.perZoneData.mapCount[index];
       return x
     }
   },
@@ -1192,7 +1192,7 @@ const toggledGraphs = {
       highChartsObj.title.text = "Time in Maps";
     },
     customFunction: (portal, item, index, x) => {
-      x = portal.perZoneData.timeOnMap[index] || 0;
+      x = portal.perZoneData.timeOnMap[index]
       return x;
     }
   },
@@ -1405,16 +1405,16 @@ function repairMapData() {
     for (dataVar of ["mapCount", "timeOnMap"]) {
       var firstMap = data.perZoneData[dataVar].findIndex(val => val > 0);
       var totalData = data.perZoneData[dataVar].filter(x => x > 0).length
-      if (data.perZoneData[dataVar].length > totalData + firstMap && firstMap != -1) {
-      }
-      else { continue; }
-      var cuum = 0
-      for (const [i, value] of data.perZoneData[dataVar].entries()) {
-        cuum += value || 0;
-        portalSaveData[portal].perZoneData[dataVar][i] = cuum
+      if (data.perZoneData[dataVar].length > totalData + firstMap && firstMap != -1) { // original repair
+        var cuum = 0
+        for (const [i, value] of data.perZoneData[dataVar].entries()) {
+          cuum += value || 0;
+          portalSaveData[portal].perZoneData[dataVar][i] = cuum
+        }
       }
     }
+    saveSetting("mapsRepaired", true)
+    console.log("Mapping data format updated")
   }
-  saveSetting("mapsRepaired", true)
-  console.log("Mapping data format updated")
 }
+
