@@ -1050,7 +1050,8 @@ const getGameData = {
     else { return 0; }
   },
   cinf: () => { return countChallengeSquaredReward(false, false, true) },
-  mutatedSeeds: () => { return game.global.mutatedSeedsSpent + game.global.mutatedSeeds }
+  mutatedSeeds: () => { return game.global.mutatedSeedsSpent + game.global.mutatedSeeds },
+  runetrinkets: () => { return game.stats.runetrinkets.value },
 }
 
 // --------- Data structures ---------
@@ -1104,6 +1105,12 @@ const graphList = [
     customFunction: (portal, i) => { return diff("scruffy", portal.initialScruffy)(portal, i) },
     toggles: ["perHr", "perZone",]
   }),
+  new Graph("runetrinkets", 2, "Runetrinkets", {
+    conditional: () => { return getGameData.u2hze() >= 130 }, // unlock (close enough)
+    toggles: ["perHr", "perZone"],
+    xminFloor: 100,
+  }
+  ),
   new Graph("mutatedSeeds", 2, "Mutated Seeds", {
     conditional: () => { return getGameData.u2hze() >= 200 },
     customFunction: (portal, i) => { return diff("mutatedSeeds", portal.initialMutes)(portal, i) },
