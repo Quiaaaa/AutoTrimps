@@ -626,7 +626,7 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
     // get data vars from toggles, replace primary if only one exists
     var activeDataVars = []
     activeToggles.forEach(toggle => { if (toggledGraphs[toggle].dataVars) activeDataVars.push(toggledGraphs[toggle].dataVars) });
-    if (activeDataVars === []) { activeDataVars = [item]; }
+    if (!activeDataVars) { activeDataVars = [item]; }
     var portalCount = 0;
     // parse data per portal
     for (const portal of Object.values(portalSaveData).reverse()) {
@@ -903,7 +903,7 @@ function Portal() {
     (graph.universe == this.universe || !graph.universe) // only save data relevant to the current universe
     && graph.conditional() && graph.dataVar) // and for relevant challenges, with datavars 
     .map((graph) => graph.dataVar)
-    .concat(["currentTime", "mapCount", "timeOnMap", "mapHeRn"]); // always graph time vars
+    .concat(["currentTime", "mapCount", "timeOnMap", "mapHeRn", "warpPerGiga"]); // always graph time vars
   perZoneItems.forEach((name) => this.perZoneData[name] = []);
 
   // update per zone data and special totals
@@ -922,6 +922,10 @@ function Portal() {
       // These are non-zone dependent and update on their own rules, but need to be cumulative 
       if (["mapHeRn", "timeOnMap", "mapCount"].includes(name)) {
         if (!data[world]) data[world] = data[world - 1] || 0
+        continue;
+      }
+      // don't touch these at all on zone transition
+      if (["warpPerGiga"].includes(name)) {
         continue;
       }
       try {
@@ -958,7 +962,8 @@ function partialPushData(updates = [[]],) {
   try {
     var perZoneData = portalSaveData[portalID].perZoneData;
     var world = getGameData.world();
-    for (var [name, value, cuum, accumulator] of updates) {
+    for (var [name, value, cuum, accumulator, customx] of updates) {
+      if (customx) world = customx;
       if (!perZoneData[name][world] && accumulator) perZoneData[name][world] += perZoneData[name][world - 1] || 0
       if (cuum) perZoneData[name][world] = value + perZoneData[name][world] || 0;
       else perZoneData[name][world] = value;
@@ -1087,6 +1092,7 @@ const graphList = [
     xminFloor: 181,
   }),
   new Graph("lastWarp", 1, "Warpstations", {
+    toggles: ["perGiga"],
     graphTitle: "Warpstations built on previous Giga",
     conditional: () => { return getGameData.u1hze() >= 59 && ((game.global.totalHeliumEarned - game.global.heliumLeftover) < 10 ** 10) }, // Warp unlock, less than 10B He allocated
     xminFloor: 60,
@@ -1177,6 +1183,7 @@ const graphList = [
 ]
 
 // rules for toggle based graphs
+// TODO code cleanup, change linegraph so that when there is a datavar and no custom function, it pulls data from the datavar instead of the base graph
 const toggledGraphs = {
   mapCount: {
     dataVars: ["mapCount"],
@@ -1202,6 +1209,20 @@ const toggledGraphs = {
       x = portal.perZoneData.timeOnMap[index]
       return x;
     }
+  },
+  perGiga: {
+    dataVars: ["warpPerGiga"],
+    graphMods: (graph, highChartsObj) => {
+      highChartsObj.title.text = "Warpstations per Gigastation"
+      highChartsObj.yAxis.title.text = "Warpstations"
+      highChartsObj.xAxis.title.text = "Gigastations"
+      highChartsObj.xAxis.floor = 0
+      highChartsObj.xAxis.ceiling = portal.perZoneData.warpPerGiga.length
+    },
+    customFunction: (portal, item, index, x) => {
+      x = portal.perZoneData.warpPerGiga[index];
+      return x
+    },
   },
   /*
   mapPct: { // not used
@@ -1403,6 +1424,21 @@ rewardResource = function () {
   }
   return output
 }
+
+// collect per-giga data
+var originalbuyUpgrade = buyUpgrade;
+buyUpgrade = function () {
+  output = originalbuyUpgrade(...arguments);
+  if (arguments[0] == "Gigastation" && output) {
+    try {
+      y = getGameData.lastWarp();
+      x = game.upgrades.Gigastation.done;
+      partialPushData([["warpPerGiga", y, false, false, x]])
+    }
+    catch (e) { graphsDebug("Gather info failed: Warps per Giga: ", e) }
+  }
+}
+
 
 
 // one time fix for a change in how data is saved
