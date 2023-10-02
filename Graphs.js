@@ -1217,7 +1217,7 @@ const toggledGraphs = {
       highChartsObj.yAxis.title.text = "Warpstations"
       highChartsObj.xAxis.title.text = "Gigastations"
       highChartsObj.xAxis.floor = 0
-      highChartsObj.xAxis.ceiling = portal.perZoneData.warpPerGiga.length
+      highChartsObj.xAxis.ceiling = 40
     },
     customFunction: (portal, item, index, x) => {
       x = portal.perZoneData.warpPerGiga[index];
