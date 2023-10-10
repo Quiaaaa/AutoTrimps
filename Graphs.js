@@ -1000,10 +1000,9 @@ const getGameData = {
   nullifium: () => { return recycleAllExtraHeirlooms(true) },
   coord: () => { return game.upgrades.Coordination.allowed - game.upgrades.Coordination.done },
   overkill: () => {
-    // overly complex check for Liq, overly fragile check for overkill cells. please rewrite this at some point.
     if (game.options.menu.overkillColor.enabled == 0) toggleSetting("overkillColor");
-    if (game.options.menu.liquification.enabled && game.talents.liquification.purchased && !game.global.mapsActive && game.global.gridArray && game.global.gridArray[0] && game.global.gridArray[0].name == "Liquimp")
-      return 100;
+    if (game.global.gridArray[0]?.name == "Liquimp") return 100;
+    // TODO this is an overly fragile check for overkill cells, but a rewrite would use a stats var that doesn't include liq. 
     else return document.getElementById("grid").getElementsByClassName("cellColorOverkill").length;
   },
   zoneTime: () => { return Math.round((getGameTime() - game.global.zoneStarted) * 100) / 100 }, // rounded to x.xs, not used
