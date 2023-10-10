@@ -1001,7 +1001,7 @@ const getGameData = {
   coord: () => { return game.upgrades.Coordination.allowed - game.upgrades.Coordination.done },
   overkill: () => {
     if (game.options.menu.overkillColor.enabled == 0) toggleSetting("overkillColor");
-    if (game.global.gridArray[0]?.name == "Liquimp") return 100;
+    if (game.global.gridArray && game.global.gridArray[0] && game.global.gridArray[0].name == "Liquimp") return 100;
     // TODO this is an overly fragile check for overkill cells, but a rewrite would use a stats var that doesn't include liq. 
     else return document.getElementById("grid").getElementsByClassName("cellColorOverkill").length;
   },
