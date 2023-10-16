@@ -97,11 +97,25 @@ function formatDuration(timeSince) {
   return timeString
 }
 
+function safeLoad(storagekey, compressed) {
+  var input = localStorage.getItem(storagekey)
+  if (input) {
+    if (compressed) input = LZString.decompressFromBase64(input);
+    try {
+      var out = JSON.parse(input);
+      if (out && out != {}) return out
+    }
+    catch (e) {
+      console.error("Failed to load Graph history", e);
+    }
+  }
+  return null
+}
+
 function loadGraphData() {
-  var loadedData = LZString.decompressFromBase64(localStorage.getItem("portalDataHistory"));
-  var currentPortal = JSON.parse(localStorage.getItem("portalDataCurrent"));
-  if (loadedData != "") {
-    var loadedData = JSON.parse(loadedData);
+  var loadedData = safeLoad("portalDataHistory", true)
+  var currentPortal = safeLoad("portalDataCurrent")
+  if (loadedData) {
     if (currentPortal) { loadedData[Object.keys(currentPortal)[0]] = Object.values(currentPortal)[0] }
     console.log("Graphs: Found portalSaveData")
     // remake object structure
@@ -112,7 +126,8 @@ function loadGraphData() {
       }
     }
   }
-  var loadedSettings = JSON.parse(localStorage.getItem("GRAPHSETTINGS"));
+
+  var loadedSettings = safeLoad("GRAPHSETTINGS")
   if (loadedSettings !== null) {
     for (const [k, v] of Object.entries(loadedSettings)) {
       GRAPHSETTINGS[k] = v;
