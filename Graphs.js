@@ -103,7 +103,7 @@ function safeLoad(storagekey, compressed) {
     if (compressed) input = LZString.decompressFromBase64(input);
     try {
       var out = JSON.parse(input);
-      if (out && out != {}) return out
+      if (out && Object.entries(out).length > 0) return out
     }
     catch (e) {
       console.error("Failed to load Graph history", e);
@@ -121,12 +121,16 @@ function loadGraphData() {
     // remake object structure
     for (const [portalID, portalData] of Object.entries(loadedData)) {
       portalSaveData[portalID] = new Portal();
-      for (const [k, v] of Object.entries(portalData)) {
-        portalSaveData[portalID][k] = v;
+      try {
+        for (const [k, v] of Object.entries(portalData)) {
+          portalSaveData[portalID][k] = v;
+        }
+      }
+      catch (e) {
+        console.log(`Error on loading ${portalID}`, portalData)
       }
     }
   }
-
   var loadedSettings = safeLoad("GRAPHSETTINGS")
   if (loadedSettings !== null) {
     for (const [k, v] of Object.entries(loadedSettings)) {
