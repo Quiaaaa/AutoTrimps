@@ -694,7 +694,7 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
           legendItemClick: (e) => {
             // Namespaced with trimps because we have no ownership of the object
             // But it is persistent so it works
-            if (!e.target.trimpsLastClick || (Date.now() - e.target.trimpsLastClick) > 200) {
+            if (!e.target.trimpsLastClick || (Date.now() - e.target.trimpsLastClick) > 500) {
               e.target.trimpsLastClick = Date.now();
             } else {
               e.preventDefault();
