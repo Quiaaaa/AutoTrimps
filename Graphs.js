@@ -380,7 +380,7 @@ function createUI() {
   document.querySelector("#u1graphSelection").value = GRAPHSETTINGS.u1graphSelection || "Clear Time";
   document.querySelector("#u2graphSelection").value = GRAPHSETTINGS.u2graphSelection || "Clear Time";
 
-  var tipsText = "You can zoom by dragging a box around an area. You can turn portals off by clicking them on the legend. Quickly view the last portal by clicking it off, then Invert Selection. Or by clicking All Off, then clicking the portal on. To delete a portal, Type its portal number in the box and press Delete Specific. Using negative numbers in the Delete Specific box will KEEP that many portals (starting counting backwards from the current one), ie: if you have Portals 1000-1015, typing -10 will keep 1005-1015."
+  var tipsText = "You can zoom by dragging a box around an area. You can turn portals off by clicking them on the legend. Quickly view the last portal by clicking it off, then Invert Selection. Or by clicking All Off, then clicking the portal on. Double clicking a portal turns on all of the same type. To delete a portal, Type its portal number in the box and press Delete Specific. Using negative numbers in the Delete Specific box will KEEP that many portals (starting counting backwards from the current one), ie: if you have Portals 1000-1015, typing -10 will keep 1005-1015."
   document.getElementById("graphFooterLine2").innerHTML += `
     <span style="float: left;" onmouseover='tooltip("Tips", "customText", event, "${tipsText}")' onmouseout='tooltip("hide")'>Tips: Hover for usage tips.</span>
     <span style="float: left; margin-left: 2vw"><input type="checkbox" id="liveCheckbox" onclick="saveSetting('live', this.checked);"> Live Updates</span>
@@ -690,6 +690,18 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
       this.graphData.push({
         name: `Portal ${portal.totalPortals}: ${portal.challenge}`,
         data: cleanData,
+        events: {
+          legendItemClick: (e) => {
+            // Namespaced with trimps because we have no ownership of the object
+            // But it is persistent so it works
+            if (!e.target.trimpsLastClick || (Date.now() - e.target.trimpsLastClick) > 500) {
+              e.target.trimpsLastClick = Date.now();
+            } else {
+              e.preventDefault();
+              toggleNameGraphs(e.target.name)
+            }
+          }
+        }
       })
       portalCount++;
       if (portalCount >= GRAPHSETTINGS.portalsDisplayed) break;
@@ -888,6 +900,18 @@ function toggleAllGraphs() {
   chart1.series.forEach(chart => visCount += chart.visible)
   for (const chart of chart1.series) {
     visCount > chart1.series.length / 2 ? chart.setVisible(false, false) : chart.setVisible(true, false);
+  }
+  chart1.redraw()
+}
+// toggle all graphs that share the same name as the clicked graph to on
+function toggleNameGraphs(name) {
+  for (const chart of chart1.series) {
+    // If the last word of the name matches, toggle it
+    if (chart.name.split(" ").pop() === name.split(" ").pop()) {
+      chart.setVisible(true, false);
+    } else {
+      chart.setVisible(false, false);
+    }
   }
   chart1.redraw()
 }
