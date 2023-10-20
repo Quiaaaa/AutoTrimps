@@ -1288,10 +1288,17 @@ const toggledGraphs = {
       graph.useAccumulator = false // HACKS this might be incredibly stupid, find out later when you use this option for a different case!
     },
     customFunction: (portal, item, index, x, time, maxS3, xprev) => {
-      // default to 0 
-      var x = x - xprev
-      var time = portal.perZoneData.currentTime[index] - portal.perZoneData.currentTime[index - 1]
-      return [x, time];
+      // discard diffs when there isn't data before or on the zone
+      // TODO no data on z1 for time per zone
+      var xdiff = null;
+      var timediff = null
+      if (x !== null && xprev !== null) {
+        xdiff = x - xprev;
+      }
+      if (portal.perZoneData.currentTime[index] !== null && portal.perZoneData.currentTime[index - 1] !== null) {
+        timediff = portal.perZoneData.currentTime[index] - portal.perZoneData.currentTime[index - 1]
+      }
+      return [xdiff, timediff];
     }
   },
   perHr: {
