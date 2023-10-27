@@ -706,7 +706,7 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
       portalCount++;
       if (portalCount >= GRAPHSETTINGS.portalsDisplayed) break;
     }
-    this.graphData = this.graphData.reverse();
+    this.graphData = this.graphData;
     highChartsObj.series = this.graphData;
     return highChartsObj;
   }
