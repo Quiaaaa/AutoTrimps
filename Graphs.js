@@ -690,6 +690,7 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
       this.graphData.push({
         name: `Portal ${portal.totalPortals}: ${portal.challenge}`,
         data: cleanData,
+        zIndex: -portalCount,
         events: {
           legendItemClick: (e) => {
             // Namespaced with trimps because we have no ownership of the object
@@ -706,7 +707,6 @@ function Graph(dataVar, universe, selectorText, additionalParams = {}) {
       portalCount++;
       if (portalCount >= GRAPHSETTINGS.portalsDisplayed) break;
     }
-    this.graphData = this.graphData;
     highChartsObj.series = this.graphData;
     return highChartsObj;
   }
