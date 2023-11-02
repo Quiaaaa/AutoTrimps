@@ -309,7 +309,7 @@ function createUI() {
   var head = document.getElementsByTagName("head")[0]
 
 
-  for (const source of ["https://code.highcharts.com/highcharts.js", "https://code.highcharts.com/modules/boost.js"]) {
+  for (const source of ["https://code.highcharts.com/11.1.0/highcharts.js", "https://code.highcharts.com/11.1.0/modules/boost.js"]) {
     var chartscript = document.createElement("script");
     chartscript.type = "text/javascript";
     chartscript.src = source
