@@ -22,7 +22,7 @@ function graphsDebug(message) {
     console.debug(...arguments);
 }
 
-var MODULES = {}
+if (typeof MODULES === 'undefined') MODULES = {}
 var startupDelay = 1000;
 setTimeout(initializeGraphs, startupDelay);
 
