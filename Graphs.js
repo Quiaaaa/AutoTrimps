@@ -1099,6 +1099,7 @@ const getGameData = {
   cinf: () => { return countChallengeSquaredReward(false, false, true) },
   mutatedSeeds: () => { return game.global.mutatedSeedsSpent + game.global.mutatedSeeds },
   runetrinkets: () => { return game.stats.runetrinkets.value },
+	chalBalance: () => { return game.challenges.Balance.balanceStacks }
 }
 
 // --------- Data structures ---------
@@ -1144,6 +1145,9 @@ const graphList = [
     conditional: () => { return getGameData.challengeActive() === "Experience" },
     xminFloor: 300,
   }),
+	new Graph("chalBalance", 1, "Balance", {
+		conditional: () => { return getGameData.challengeActive() === "Balance" }, 
+	}),
 
   // U2 Graphs
   new Graph("radonOwned", 2, "Radon", {
