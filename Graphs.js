@@ -1300,7 +1300,7 @@ const toggledGraphs = {
 		},
 		customFunction: (portal, item, index, x, time, maxS3, xprev) => {
 			// discard diffs when there isn't data before or on the zone
-			// TODO no data on z1 for time per zone
+			if (index == 1) return [x, portal.perZoneData.currentTime[index]]; // short circuit for zone 1 which has no diff
 			var xdiff = null;
 			var timediff = null
 			if (x !== null && xprev !== null) {
