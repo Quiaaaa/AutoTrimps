@@ -1068,7 +1068,8 @@ const getGameData = {
 		}
 		return exp
 	},
-	//nursery: () => { return game.buildings.Nursery.purchased },
+	nursery: () => { return game.buildings.Nursery.purchased },
+	nurseryCurrent: () => { return game.buildings.Nursery.owned }, // TODO possible fancy graph with both stats
 	amals: () => { return game.jobs.Amalgamator.owned },
 	wonders: () => { return game.challenges.Experience.wonders },
 	scruffy: () => { return game.global.fluffyExp2 },
@@ -1140,6 +1141,10 @@ const graphList = [
 		customFunction: (portal, i) => { return diff("essence", portal.initialDE)(portal, i) },
 		toggles: ["perHr", "perZone",],
 		xminFloor: 181,
+	}),
+	new Graph("nursery", 1, "Nurseries", {
+		graphTitle: "Nurseries Purchased",
+		toggles: ["perZone"]
 	}),
 	new Graph("lastWarp", 1, "Warpstations", {
 		toggles: ["perGiga"],
