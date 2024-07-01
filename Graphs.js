@@ -256,16 +256,28 @@ function clearData(keepN, clrall = false) {
 }
 
 function deleteSpecific() {
-	var portalNum = Number(document.getElementById("deleteSpecificTextBox").value);
-	if (parseInt(portalNum) < 0) { clearData(Math.abs(portalNum)); } // keep X portals, delete the rest
-	else {
+	var portalNum = document.getElementById("deleteSpecificTextBox").value
+	if (isNaN(parseInt(portalNum))) { // challenge name deletion
+		var portalType = portalNum.toLocaleLowerCase()
+		if (portalType === "") return; // Don't delete everything with blank input, that would be bad.
 		for (const [portalID, portalData] of Object.entries(portalSaveData)) {
-			if (portalData.totalPortals === portalNum && portalData.universe == GRAPHSETTINGS.universeSelection) { // only delete if in selected universe
+			if (portalData.challenge.toLocaleLowerCase().includes(portalType) && portalData.universe == GRAPHSETTINGS.universeSelection) { // only delete if in selected universe
 				delete portalSaveData[portalID];
 				graphsDebug(`Deleting ${portalID}, deleteSpecific`)
 			}
 		}
+	} else {
+		if (parseInt(portalNum) < 0) { clearData(Math.abs(portalNum)); } // keep X portals, delete the rest
+		else if (parseInt(portalNum) > 0) { // single portal deletion
+			for (const [portalID, portalData] of Object.entries(portalSaveData)) {
+				if (portalData.totalPortals === portalNum && portalData.universe == GRAPHSETTINGS.universeSelection) { // only delete if in selected universe
+					delete portalSaveData[portalID];
+					graphsDebug(`Deleting ${portalID}, deleteSpecific`)
+				}
+			}
+		}
 	}
+
 	savePortalData(true)
 	showHideUnusedGraphs();
 }
@@ -359,18 +371,21 @@ function createUI() {
 		["u2graphSelection", graphList.filter((g) => g.universe == 2 || !g.universe).map((g) => g.selectorText)]
 	].forEach((opts) => universeFooter.appendChild(createSelector(...opts)))
 
+	var tipsTextDel = "To delete a portal, type its portal number in the box and press Delete Specific. Using negative numbers in the Delete Specific box will KEEP that many portals (starting counting backwards from the current one), ie: if you have Portals 1000-1015, typing -10 will keep 1005-1015. You can also delete portals by challenge name, matches are non case sensitive and allow partial matches, ie coord matches Coordinated."
 	universeFooter.innerHTML += `
-    <div><button onclick="drawGraph()" style="margin-left:0.5em;">Refresh</button></div>
-    <div style="flex:0 100 5%;"></div>
-    <div><input type="checkbox" id="clrChkbox" onclick="toggleClearButton();"></div>
-    <div style="margin-left: 0.5vw;">
+    <span><button onclick="drawGraph()" style="margin-left:0.5em;">Refresh</button></span>
+    <span style="flex:0 100 5%;"></span>
+    <span><input type="checkbox" id="clrChkbox" onclick="toggleClearButton();"></span>
+    <span style="margin-left: 0.5vw;">
       <button id="clrAllDataBtn" onclick="clearData(null,true); drawGraph();" class="btn" disabled="" style="flex:auto; padding: 2px 6px;border: 1px solid white;">
-        Clear All U1 Data</button></div>
-    <div style="flex:0 100 5%;"></div>
-    <div style="flex:0 2 3.5vw;"><input style="width:100%;min-width: 40px;" id="deleteSpecificTextBox"></div>
-    <div style="flex:auto; margin-left: 0.5vw;"><button id="deleteSpecificBtn" onclick="deleteSpecific(); drawGraph();">Delete Specific U1 Portal</button></div>
-    <div style="float:right; margin-right: 0.5vw;"><button onclick="toggleSpecificGraphs()">Invert Selection</button></div>
-    <div style="float:right; margin-right: 1vw;"><button onclick="toggleAllGraphs()">All Off/On</button></div>
+        Clear All U1 Data</button></span>
+    <span style="flex:0 100 5%;"></span>
+		
+    <span style="flex:0 2 3.5vw;"><input style="width:100%;min-width: 40px;" id="deleteSpecificTextBox"></span>
+    <span style="flex:auto; margin-left: 0.5vw;" onmouseover='tooltip("Tips", "customText", event, "${tipsTextDel}")' onmouseout='tooltip("hide")'><button id="deleteSpecificBtn" onclick="deleteSpecific(); drawGraph();">Delete Specific U1 Portals</button></span>
+		
+    <span style="float:right; margin-right: 0.5vw;" ><button onclick="toggleSpecificGraphs()">Invert Selection</button></span>
+    <span style="float:right; margin-right: 1vw;"><button onclick="toggleAllGraphs()">All Off/On</button></span>
     <button onclick="importExportGraphsDialog()">Import/Export</button>`
 
 
@@ -380,7 +395,7 @@ function createUI() {
 	document.querySelector("#u1graphSelection").value = GRAPHSETTINGS.u1graphSelection || "Clear Time";
 	document.querySelector("#u2graphSelection").value = GRAPHSETTINGS.u2graphSelection || "Clear Time";
 
-	var tipsText = "You can zoom by dragging a box around an area. You can turn portals off by clicking them on the legend, or double click to turn on/off all of the same challenge. Quickly view the last portal by clicking it off, then Invert Selection. Or by clicking All Off, then clicking the portal on. Double clicking a portal turns on all of the same type. To delete a portal, Type its portal number in the box and press Delete Specific. Using negative numbers in the Delete Specific box will KEEP that many portals (starting counting backwards from the current one), ie: if you have Portals 1000-1015, typing -10 will keep 1005-1015."
+	var tipsText = "You can zoom by dragging a box around an area. You can turn portals off by clicking them on the legend, or double click to turn on/off all of the same challenge. Quickly view the last portal by clicking it off, then Invert Selection. Or by clicking All Off, then clicking the portal on. Double clicking a portal turns on all of the same type."
 	document.getElementById("graphFooterLine2").innerHTML += `
     <span style="float: left;" onmouseover='tooltip("Tips", "customText", event, "${tipsText}")' onmouseout='tooltip("hide")'>Tips: Hover for usage tips.</span>
     <span style="float: left; margin-left: 2vw"><input type="checkbox" id="liveCheckbox" onclick="saveSetting('live', this.checked);"> Live Updates</span>
@@ -435,7 +450,7 @@ function swapGraphUniverse() {
 	document.getElementById(`${active}graphSelection`).style.display = '';
 	document.getElementById(`${inactive}graphSelection`).style.display = 'none';
 	document.getElementById("clrAllDataBtn").innerText = `Clear All U${universe} Data`;
-	document.getElementById("deleteSpecificBtn").innerText = `Delete Specific U${universe} Portal`;
+	document.getElementById("deleteSpecificBtn").innerText = `Delete Specific U${universe} Portals`;
 }
 
 function toggleClearButton() {
