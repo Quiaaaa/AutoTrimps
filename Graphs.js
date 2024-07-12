@@ -267,8 +267,9 @@ function deleteSpecific() {
 			}
 		}
 	} else {
-		if (parseInt(portalNum) < 0) { clearData(Math.abs(portalNum)); } // keep X portals, delete the rest
-		else if (parseInt(portalNum) > 0) { // single portal deletion
+		portalNum = parseInt(portalNum)
+		if (portalNum < 0) { clearData(Math.abs(portalNum)); } // keep X portals, delete the rest
+		else if (portalNum > 0) { // single portal deletion
 			for (const [portalID, portalData] of Object.entries(portalSaveData)) {
 				if (portalData.totalPortals === portalNum && portalData.universe == GRAPHSETTINGS.universeSelection) { // only delete if in selected universe
 					delete portalSaveData[portalID];
@@ -277,7 +278,6 @@ function deleteSpecific() {
 			}
 		}
 	}
-
 	savePortalData(true)
 	showHideUnusedGraphs();
 }
