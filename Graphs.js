@@ -423,9 +423,9 @@ function createUI() {
 				if ("graphSelection" == h.id) return void (2 != game.options.menu.darkTheme.enabled && (h.style.color = "black"));
 			}
 			toggleDarkGraphs();
-			var c = document.getElementsByTagName("input");
-			var d = document.getElementsByTagName("select");
-			var e = document.getElementById("graphFooterLine1").children;
+			var c = document.querySelector("#graphParent").getElementsByTagName("input");
+			var d = document.querySelector("#graphParent").getElementsByTagName("select");
+			var e = document.querySelector("#graphFooterLine1").children;
 			for (var h of c) f(h);
 			for (var h of d) f(h);
 			for (var h of e) f(h);
