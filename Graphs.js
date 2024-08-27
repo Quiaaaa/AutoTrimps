@@ -905,8 +905,9 @@ function applyRememberedSelections() {
 }
 function toggleSpecificGraphs() {
 	for (const chart of chart1.series) {
-		chart.visible ? chart.hide() : chart.show();
+		chart.visible ? chart.setVisible(false, false) : chart.setVisible(true, false);
 	}
+	chart1.redraw();
 }
 // toggle all graphs to the opposite of the average visible/hidden state
 function toggleAllGraphs() {
