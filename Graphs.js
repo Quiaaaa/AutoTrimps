@@ -1043,7 +1043,7 @@ function mapUpdate() {
 }
 
 // hopefully complete, not verified
-const stackChallenges = { Balance: "balanceStacks", Decay: "stacks", Life: "stacks", Toxicity: "stacks", Frigid: "warmth", Unbalance: "balanceStacks", Melt: "stacks", Quagmire: "exhaustedStacks", Wither: "trimpStacks", Revenge: "stacks", Mayhem: "stacks", Storm: "totalClouds", Insanity: "insanity", Berserk: "weakened", Exterminate: "swarmStacks", Pandemonium: "pandemonium", Smithless: "fakeSmithies", Desolation: "chilled", }
+const stackChallenges = { Balance: "balanceStacks", Decay: "stacks", Life: "stacks", Toxicity: "stacks", Frigid: "warmth", Unbalance: "balanceStacks", Melt: "stacks", Quagmire: "exhaustedStacks", Wither: "trimpStacks", Revenge: "stacks", Mayhem: "stacks", Storm: "totalClouds", Insanity: "insanity", Berserk: "weakened", Exterminate: "swarmStacks", Pandemonium: "pandemonium", Smithless: "fakeSmithies", Desolation: "chilled", Nurture: "level", }
 
 const getGameData = {
 	currentTime: () => { return getGameTime() - game.global.portalTime }, // portalTime changes on pause, 'when a portal started' is not a static concept
