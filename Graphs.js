@@ -1207,7 +1207,9 @@ const graphList = [
 		conditional: () => { return getGameData.challengeActive() === "Hypothermia" }
 	}),
 	new Graph("cruffys", 2, "Cruffys", {
-		conditional: () => { return getGameData.challengeActive() === "Nurture" }
+		conditional: () => { return false }, // getGameData.challengeActive() === "Nurture" // 
+		graphTitle: "Cruffys (Depreciated in favor of Challenge Stacks)"
+
 	}),
 
 	// Generic Graphs
