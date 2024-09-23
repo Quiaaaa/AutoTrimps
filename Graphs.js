@@ -1018,6 +1018,10 @@ function pushData(fromMap) {
 function partialPushData(updates = [[]],) {
 	const portalID = getportalID();
 	try {
+		if (!portalSaveData[portalID]) {
+			pushData(); // create portal data if we somehow trigger a non-zone event without a portal created
+			console.debug("Current portal did not start logging correctly, restarting", portalID)
+		}
 		var perZoneData = portalSaveData[portalID].perZoneData;
 		var world = getGameData.world();
 		for (var [name, value, cuum, accumulator, customx] of updates) {
@@ -1028,7 +1032,7 @@ function partialPushData(updates = [[]],) {
 		}
 	}
 	catch (e) {
-		console.debug("Failed to update: ", updates, e)
+		console.debug("Failed to update: ", portalID, updates, e)
 	}
 	savePortalData(false) // save current portal
 	if (GRAPHSETTINGS.live && GRAPHSETTINGS.open) {
@@ -1207,7 +1211,7 @@ const graphList = [
 		conditional: () => { return getGameData.challengeActive() === "Hypothermia" }
 	}),
 	new Graph("cruffys", 2, "Cruffys", {
-		conditional: () => { return false }, // getGameData.challengeActive() === "Nurture" // 
+		conditional: () => { return false }, // getGameData.challengeActive() === "Nurture"
 		graphTitle: "Cruffys (Depreciated in favor of Challenge Stacks)"
 
 	}),
