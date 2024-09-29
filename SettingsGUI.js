@@ -1594,12 +1594,15 @@ function autoPlusSettingsMenu() {
 }
 
 function updateCustomButtons() {
-    if (lastTheme && game.options.menu.darkTheme.enabled != lastTheme) {
-        if (typeof MODULES["graphs"] !== 'undefined')
-            MODULES["graphs"].themeChanged();
-        debug("Theme change - AutoTrimps styles updated.");
-    }
-    lastTheme = game.options.menu.darkTheme.enabled;
+	const isGraphModuleDefined = typeof MODULES.graphs !== 'undefined';
+	const isLastThemeDefined = isGraphModuleDefined && typeof MODULES.graphs._lastTheme !== 'undefined';
+	const hasThemeChanged = isLastThemeDefined && game.options.menu.darkTheme.enabled !== MODULES.graphs._lastTheme;
+
+	if (isGraphModuleDefined && hasThemeChanged) {
+		MODULES.graphs.themeChanged();
+		MODULES.graphs._lastTheme = game.options.menu.darkTheme.enabled;
+		debug("Theme change - AutoTrimps styles updated.");
+	}
 
     function toggleElem(elem, showHide) {
         var $item = document.getElementById(elem);
