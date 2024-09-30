@@ -282,7 +282,6 @@ function doPortal(challenge) {
 	buyPortalUpgrade('Looting_II');
 	debug('Second Stage: Bought Max Looting II');
     }
-    pushData();
     activatePortal();
     lastHeliumZone = 0; zonePostpone = 0;
 }
@@ -500,7 +499,6 @@ function RdoPortal(challenge) {
 	}
 	
     }
-    pushData();
     RresetVars();
     activatePortal();
     lastRadonZone = 0; RzonePostpone = 0;
