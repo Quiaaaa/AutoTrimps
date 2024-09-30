@@ -118,8 +118,6 @@ const Graphs = {
 				}
 			}
 			Graphs.Settings.open = false;
-			MODULES.graphs = {}
-			MODULES.graphs.useDarkAlways = false
 		},
 
 		importGraphs: function () {
@@ -355,33 +353,35 @@ const Graphs = {
 
 
 			// Adjust UI elements for Trimps Theme changes
-			MODULES.graphs.themeChanged = function () {
-				if (game && game.options.menu.darkTheme.enabled != this._lastTheme) {
-					function f(h) {
-						h.style.color = 2 == game.options.menu.darkTheme.enabled ? "" : "black";
-					}
-					function g(h) {
-						if ("graphSelection" == h.id) return void (2 != game.options.menu.darkTheme.enabled && (h.style.color = "black"));
-					}
-					Graphs.UI.toggleDarkGraphs();
-					var c = document.querySelector("#graphParent").getElementsByTagName("input");
-					var d = document.querySelector("#graphParent").getElementsByTagName("select");
-					var e = document.querySelector("#graphFooterLine1").children;
-					for (var h of c) f(h);
-					for (var h of d) f(h);
-					for (var h of e) f(h);
-					for (var h of e) g(h);
-				}
-				game && (this._lastTheme = game.options.menu.darkTheme.enabled);
-			}
+
 
 			document.querySelector("#blackCB").checked = Graphs.Settings.darkTheme;
 			document.querySelector("#portalCountTextBox").value = Graphs.Settings.portalsDisplayed;
 			document.querySelector("#portalsSavedTextBox").value = Graphs.Settings.maxGraphs;
 			document.querySelector("#liveCheckbox").checked = Graphs.Settings.live;
-			MODULES.graphs.themeChanged();
+			this.themeChanged();
 
 			this.showHideUnused()
+		},
+
+		themeChanged: function () {
+			if (game && game.options.menu.darkTheme.enabled != this._lastTheme) {
+				function f(h) {
+					h.style.color = 2 == game.options.menu.darkTheme.enabled ? "" : "black";
+				}
+				function g(h) {
+					if ("graphSelection" == h.id) return void (2 != game.options.menu.darkTheme.enabled && (h.style.color = "black"));
+				}
+				Graphs.UI.toggleDarkGraphs();
+				var c = document.querySelector("#graphParent").getElementsByTagName("input");
+				var d = document.querySelector("#graphParent").getElementsByTagName("select");
+				var e = document.querySelector("#graphFooterLine1").children;
+				for (var h of c) f(h);
+				for (var h of d) f(h);
+				for (var h of e) f(h);
+				for (var h of e) g(h);
+			}
+			game && (this._lastTheme = game.options.menu.darkTheme.enabled);
 		},
 
 		swapGraphUniverse: function () {
@@ -1436,7 +1436,6 @@ const GraphsConfig = {
 
 
 // --------- Runtime ---------
-if (typeof MODULES === 'undefined') MODULES = {}; // don't overwrite if AT has already created this
 if (typeof graphsBasePath === 'undefined') graphsBasePath = 'https://Quiaaaa.github.io/AutoTrimps/'; //Link to your own Github here if you forked!
 if (localStorage["allSaveData"]) delete localStorage["allSaveData"]; // remove old AT graph data
 
