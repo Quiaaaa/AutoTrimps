@@ -261,7 +261,7 @@ const Graphs = {
 					overflow: auto;
 					position: relative;
 					display: grid;
-					grid-template-columns: repeat(3, 1fr);
+					grid-template-columns: repeat(3,  minmax(1fr, max-content));
 					grid-template-rows: 2.5em 1fr 2.5em 2.5em;
 					font-size: 1em;
 				}
@@ -283,40 +283,47 @@ const Graphs = {
 					display: grid;
 					grid-template-columns: subgrid;
 					grid-template-rows: subgrid;
+					margin-top: .2em
 				}
 
-				.footerR1 {
+				#graphFooter .footerR1 {
 					grid-row: 1;
 				}
 
-				.footerR2 {
+				#graphFooter .footerR2 {
 					grid-row: 2;
 				}
 
-				.footerLeft {
+				#graphFooter .footerLeft {
 					grid-column: 1;
 				}
 
-				.footerCenter {
+				#graphFooter .footerCenter {
 					grid-column: 2;
 					justify-self: center;
 				}
 
-				.footerRight {
+				#graphFooter .footerRight {
 					grid-column: 3;
 					justify-self: end;
 				}
 
-				.graphInput {
+				#graphParent input:not([type=checkbox]) {
 					width: 3em;
+					text-align: center;
 				}
 
 				.btnContainer {
 					margin: 0 .5em 0 .5em;
 				}
 
-				#clrAllDataBtn {
+				#graphParent  button, input, select {
+					background: black;
+					color: white;
+					padding: .2em;
+					border-radius: 0px;
 					border: 1px solid white;
+					margin-inline: .1em
 				}
 			`;
 			document.head.appendChild(styleElem);
@@ -324,15 +331,13 @@ const Graphs = {
 
 		createUI: function () {
 			// Create all of the UI elements and load in scripts needed
-			// TODO reduce screaming
-			var head = document.getElementsByTagName("head")[0]
 
 			for (const source of ["https://code.highcharts.com/11.1.0/highcharts.js", "https://code.highcharts.com/11.1.0/modules/boost.js"]) {
 				var chartscript = document.createElement("script");
 				chartscript.type = "text/javascript";
 				chartscript.src = source
 				chartscript.async = false
-				head.appendChild(chartscript);
+				document.head.appendChild(chartscript);
 			}
 
 			this._createStyles();
@@ -368,7 +373,7 @@ const Graphs = {
 								<button id="clrAllDataBtn" class="btn" disabled="">Clear All U1 Data</button>
 							</span>
 							<span class="btnContainer" id="deleteSpecificCont">
-								<input id="deleteSpecificTextBox" class="graphInput">
+								<input id="deleteSpecificTextBox">
 								<button id="deleteSpecificBtn">Delete Specific U1 Portals</button>
 							</span>
 						</div>
@@ -381,14 +386,14 @@ const Graphs = {
 						</div>
 						<div class="footerLeft footerR2">
 							<span id="GraphsTips" class="btnContainer">Tips: Hover for usage tips.</span>
-							<span><input type="checkbox" id="liveCheckbox" class="btnContainer">Live Updates</span>
+							<span class="btnContainer"><input type="checkbox" id="liveCheckbox">Live Updates</span>
 						</div>
 						<div class="footerCenter footerR2">
-							<span class="btnContainer">Displayed Portals: <input id="portalCountTextBox" class="graphInput"></span>
-							<span class="btnContainer">Saved Portals: <input id="portalsSavedTextBox" class="graphInput"></span>
+							<span class="btnContainer">Displayed Portals: <input id="portalCountTextBox"></span>
+							<span class="btnContainer">Saved Portals: <input id="portalsSavedTextBox"></span>
 						</div>
 						<div class="footerRight footerR2">
-							<span class="btnContainer">Black Graphs:<input id="blackCB" type="checkbox"></span>
+							<span class="btnContainer"><input id="blackCB" type="checkbox">Black Graphs</span>
 						</div>
 					</div>
 				</div>
@@ -451,30 +456,8 @@ const Graphs = {
 			document.querySelector("#portalsSavedTextBox").value = Graphs.Settings.maxGraphs;
 			document.querySelector("#liveCheckbox").checked = Graphs.Settings.live;
 
-			this.themeChanged();
+			this.toggleDarkGraphs();
 			this.showHideUnused()
-		},
-
-		themeChanged: function () {
-			// Adjust UI elements for Trimps Theme changes
-			// TODO should really be called on theme changed, not just on load
-			if (game && game.options.menu.darkTheme.enabled != this._lastTheme) {
-				function f(h) {
-					h.style.color = 2 == game.options.menu.darkTheme.enabled ? "" : "black";
-				}
-				function g(h) {
-					if ("graphSelection" == h.id) return void (2 != game.options.menu.darkTheme.enabled && (h.style.color = "black"));
-				}
-				Graphs.UI.toggleDarkGraphs();
-				var c = document.querySelector("#graphParent").getElementsByTagName("input");
-				var d = document.querySelector("#graphParent").getElementsByTagName("select");
-				var e = document.querySelector("#graphFooter").children;
-				for (var h of c) f(h);
-				for (var h of d) f(h);
-				for (var h of e) f(h);
-				for (var h of e) g(h);
-			}
-			game && (this._lastTheme = game.options.menu.darkTheme.enabled);
 		},
 
 		swapGraphUniverse: function () {
