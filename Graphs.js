@@ -323,7 +323,6 @@ const Graphs = {
 					padding: .2em;
 					border-radius: 0px;
 					border: 1px solid white;
-					margin-inline: .1em
 				}
 			`;
 			document.head.appendChild(styleElem);
@@ -365,7 +364,6 @@ const Graphs = {
 					<div id="graphFooter">
 						<div class="footerLeft footerR1">
 							<span id="graphsSelectorContainer" class="btnContainer"></span>
-							<button id="GraphsRefresh" class="btnContainer">Refresh</button>
 						</div>
 						<div class="footerCenter footerR1">
 							<span class="btnContainer">
@@ -378,19 +376,19 @@ const Graphs = {
 							</span>
 						</div>
 						<div class="footerRight footerR1">
-							<span class="btnContainer">
+							<span id="GraphsLegendCtrl" class="btnContainer">
 								<button id="GraphsInvertSelection">Invert Selection</button>
 								<button id="GraphsToggleAll">All Off/On</button>
 							</span>
 							<button id="GraphsExport" class="btnContainer">Import/Export</button>
 						</div>
 						<div class="footerLeft footerR2">
-							<span id="GraphsTips" class="btnContainer">Tips: Hover for usage tips.</span>
+							<button id="GraphsRefresh" class="btnContainer">Refresh</button>
 							<span class="btnContainer"><input type="checkbox" id="liveCheckbox">Live Updates</span>
 						</div>
 						<div class="footerCenter footerR2">
-							<span class="btnContainer">Displayed Portals: <input id="portalCountTextBox"></span>
-							<span class="btnContainer">Saved Portals: <input id="portalsSavedTextBox"></span>
+							<span class="btnContainer"><input id="portalCountTextBox">Displayed Portals</span>
+							<span class="btnContainer"><input id="portalsSavedTextBox">Saved Portals</span>
 						</div>
 						<div class="footerRight footerR2">
 							<span class="btnContainer"><input id="blackCB" type="checkbox">Black Graphs</span>
@@ -423,8 +421,8 @@ const Graphs = {
 				["u2graphSelection", GraphsConfig.graphList.filter((g) => g.universe == 2 || !g.universe).map((g) => g.selectorText)],
 			].forEach((opts) => selectorContainer.appendChild(createSelector(...opts)))
 
-			var tipsTextDel = "To delete a portal, type its portal number in the box and press Delete Specific. Using negative numbers in the Delete Specific box will KEEP that many portals (starting counting backwards from the current one), ie: if you have Portals 1000-1015, typing -10 will keep 1005-1015. You can also delete portals by challenge name, matches are non case sensitive and allow partial matches, ie coord matches Coordinated."
-			var tipsText = "You can zoom by dragging a box around an area. You can turn portals off by clicking them on the legend, or double click to turn on/off all of the same challenge. Quickly view the last portal by clicking it off, then Invert Selection. Or by clicking All Off, then clicking the portal on. Double clicking a portal turns on all of the same type."
+			var GraphsTipsDelete = "To delete a portal, type its portal number in the box and press Delete Specific. Using negative numbers in the Delete Specific box will keep that many portals (starting counting backwards from the current one), ie: if you have Portals 1000-1015, typing -10 will keep 1005-1015. <br> You can also delete portals by challenge name, matches are non case sensitive and allow partial matches, ie coord matches Coordinated."
+			var GraphsTips = "You can zoom by dragging a box around an area. You can toggle portals by clicking them on the legend, or double click to toggle all of the same challenge. <br> Quickly view the last portal by clicking it off, then Invert Selection. Or by clicking All Off, then clicking the portal on."
 
 			const GraphUIEvents = [
 				["click", "GraphsRefresh", function () { Graphs.ChartArea.draw() }],
@@ -436,8 +434,8 @@ const Graphs = {
 				["click", "GraphsExport", function () { Graphs.UI.importExportGraphsDialog() }],
 				["click", "liveCheckbox", function () { Graphs.Backend.saveSetting('live', this.checked) }],
 				["click", "blackCB", function () { Graphs.UI.toggleDarkGraphs() }],
-				["mouseover", "deleteSpecificCont", function () { tooltip("Tips", "customText", event, `${tipsTextDel}`) }],
-				["mouseover", "GraphsTips", function () { tooltip("Tips", "customText", event, `${tipsText}`) }],
+				["mouseover", "deleteSpecificCont", function () { tooltip("Tips", "customText", event, `${GraphsTipsDelete}`) }],
+				["mouseover", "GraphsLegendCtrl", function () { tooltip("Tips", "customText", event, `${GraphsTips}`) }],
 				["change", "portalCountTextBox", function () { Graphs.Backend.saveSetting('portalsDisplayed', this.value); Graphs.ChartArea.update(); }],
 				["change", "portalsSavedTextBox", function () { Graphs.Backend.saveSetting('maxGraphs', this.value); Graphs.Backend.clearData(this.value); Graphs.ChartArea.update(); }],
 			]
