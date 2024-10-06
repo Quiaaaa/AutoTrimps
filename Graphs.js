@@ -317,7 +317,7 @@ const Graphs = {
 					margin: 0 .5em 0 .5em;
 				}
 
-				#graphParent  button, input, select {
+				#graphParent button, #graphParent input, #graphParent select {
 					background: black;
 					color: white;
 					padding: .2em;
