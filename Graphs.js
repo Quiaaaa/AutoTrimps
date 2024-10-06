@@ -253,12 +253,79 @@ const Graphs = {
 				ondisplay();
 		},
 
+		_createStyles: function () {
+			let styleElem = document.createElement("style");
+			styleElem.textContent = `
+				#graphParent {
+					height: 600px;
+					overflow: auto;
+					position: relative;
+					display: grid;
+					grid-template-columns: repeat(3, 1fr);
+					grid-template-rows: 2.5em 1fr 2.5em 2.5em;
+					font-size: 1em;
+				}
+
+				#toggleDiv {
+					grid-area: 1 / 1;
+					margin: 1em;
+					z-index: 1;
+				}
+
+				#graph {
+					grid-column: 1/-1;
+					grid-row: 1/3;
+				}
+
+				#graphFooter {
+					grid-column: 1/-1;
+					grid-row: 3/-1;
+					display: grid;
+					grid-template-columns: subgrid;
+					grid-template-rows: subgrid;
+				}
+
+				.footerR1 {
+					grid-row: 1;
+				}
+
+				.footerR2 {
+					grid-row: 2;
+				}
+
+				.footerLeft {
+					grid-column: 1;
+				}
+
+				.footerCenter {
+					grid-column: 2;
+					justify-self: center;
+				}
+
+				.footerRight {
+					grid-column: 3;
+					justify-self: end;
+				}
+
+				.graphInput {
+					width: 3em;
+				}
+
+				.btnContainer {
+					margin: 0 .5em 0 .5em;
+				}
+
+				#clrAllDataBtn {
+					border: 1px solid white;
+				}
+			`;
+			document.head.appendChild(styleElem);
+		},
 
 		createUI: function () {
 			// Create all of the UI elements and load in scripts needed
 			// TODO reduce screaming
 			var head = document.getElementsByTagName("head")[0]
-
 
 			for (const source of ["https://code.highcharts.com/11.1.0/highcharts.js", "https://code.highcharts.com/11.1.0/modules/boost.js"]) {
 				var chartscript = document.createElement("script");
@@ -268,103 +335,129 @@ const Graphs = {
 				head.appendChild(chartscript);
 			}
 
+			this._createStyles();
 
 			var graphsButton = document.createElement("TD");
-			graphsButton.appendChild(document.createTextNode("Graphs"))
-			graphsButton.setAttribute("class", "btn btn-default")
-			graphsButton.setAttribute("onclick", "Graphs.UI.escapeATWindows(false); Graphs.ChartArea.draw(); Graphs.UI.swapGraphUniverse();");
+			graphsButton.innerText = "Graphs";
+			graphsButton.classList.add("btn", "btn-default");
+			graphsButton.id = "graphsBtn";
+			graphsButton.addEventListener("click", function () { Graphs.UI.escapeATWindows(false); Graphs.ChartArea.draw(); Graphs.UI.swapGraphUniverse(); });
 
-			var settingbarRow = document.getElementById("settingsTable").firstElementChild.firstElementChild;
-			settingbarRow.insertBefore(graphsButton, settingbarRow.childNodes[10])
+			// insert after Achievements
+			document.getElementById("settingsTable").firstElementChild.firstElementChild.childNodes[9].insertAdjacentElement("afterend", graphsButton);
 
-			document.getElementById("settingsRow").innerHTML += `
-    <div id="graphParent" style="display: none; height: 600px; overflow: auto; position: relative;">
-      <div id="graph" style="margin-bottom: 10px;margin-top: 5px; height: 530px;"></div>
-      <div id="graphFooter" style="height: 50px;font-size: 1em;">
-        <div id="graphFooterLine1" style="display: -webkit-flex;flex: 0.75;flex-direction: row; height:30px;"></div>
-        <div id="graphFooterLine2"></div>
-      </div>
-    </div>
-    `;
+			/* 
+			Layout is a 3 column, 4 row grid
+			Header r1, overlapping the Graph
+			Graph  r1-2
+			Footer r3-4
+			*/
+			document.getElementById("settingsRow").insertAdjacentHTML("afterbegin",
+				`
+				<div id="graphParent" style="display: none;">
+					<div id="toggleDiv"></div>
+					<div id="graph"></div>
+					<div id="graphFooter">
+						<div class="footerLeft footerR1">
+							<span id="graphsSelectorContainer" class="btnContainer"></span>
+							<button id="GraphsRefresh" class="btnContainer">Refresh</button>
+						</div>
+						<div class="footerCenter footerR1">
+							<span class="btnContainer">
+								<input id="clrChkbox" type="checkbox">
+								<button id="clrAllDataBtn" class="btn" disabled="">Clear All U1 Data</button>
+							</span>
+							<span class="btnContainer" id="deleteSpecificCont">
+								<input id="deleteSpecificTextBox" class="graphInput">
+								<button id="deleteSpecificBtn">Delete Specific U1 Portals</button>
+							</span>
+						</div>
+						<div class="footerRight footerR1">
+							<span class="btnContainer">
+								<button id="GraphsInvertSelection">Invert Selection</button>
+								<button id="GraphsToggleAll">All Off/On</button>
+							</span>
+							<button id="GraphsExport" class="btnContainer">Import/Export</button>
+						</div>
+						<div class="footerLeft footerR2">
+							<span id="GraphsTips" class="btnContainer">Tips: Hover for usage tips.</span>
+							<span><input type="checkbox" id="liveCheckbox" class="btnContainer">Live Updates</span>
+						</div>
+						<div class="footerCenter footerR2">
+							<span class="btnContainer">Displayed Portals: <input id="portalCountTextBox" class="graphInput"></span>
+							<span class="btnContainer">Saved Portals: <input id="portalsSavedTextBox" class="graphInput"></span>
+						</div>
+						<div class="footerRight footerR2">
+							<span class="btnContainer">Black Graphs:<input id="blackCB" type="checkbox"></span>
+						</div>
+					</div>
+				</div>
+    `);
 
-			function createSelector(id, sourceList, textMod = "", onchangeMod = "") {
+			function createSelector(id, sourceList, textMod = "", onchangeMod) {
 				var selector = document.createElement("select");
 				selector.id = id;
-				selector.setAttribute("style", "");
-				selector.setAttribute("onchange", "Graphs.Backend.saveSetting(this.id, this.value); Graphs.ChartArea.draw();" + onchangeMod);
+				//selector.setAttribute("style", "");
+				selector.addEventListener("change", function () { Graphs.Backend.saveSetting(this.id, this.value); Graphs.ChartArea.draw(); });
+				if (onchangeMod) { selector.addEventListener("change", onchangeMod); }
 				for (var item of sourceList) {
 					var opt = document.createElement("option");
 					opt.value = item;
 					opt.text = textMod + item;
 					selector.appendChild(opt);
 				}
-				//selector.value = Graphs.Settings[selector.id]
+				selector.value = Graphs.Settings[selector.id];
 				return selector;
-			}
+			};
 
 			// Create Universe and Graph selectors
-			var universeFooter = document.getElementById("graphFooterLine1");
+			var selectorContainer = document.querySelector("#graphsSelectorContainer");
 			[
-				["universeSelection", [1, 2], "Universe ", " Graphs.UI.swapGraphUniverse();"],
+				["universeSelection", [1, 2], "Universe ", function () { Graphs.UI.swapGraphUniverse(); }],
 				["u1graphSelection", GraphsConfig.graphList.filter((g) => g.universe == 1 || !g.universe).map((g) => g.selectorText)],
-				["u2graphSelection", GraphsConfig.graphList.filter((g) => g.universe == 2 || !g.universe).map((g) => g.selectorText)]
-			].forEach((opts) => universeFooter.appendChild(createSelector(...opts)))
+				["u2graphSelection", GraphsConfig.graphList.filter((g) => g.universe == 2 || !g.universe).map((g) => g.selectorText)],
+			].forEach((opts) => selectorContainer.appendChild(createSelector(...opts)))
 
 			var tipsTextDel = "To delete a portal, type its portal number in the box and press Delete Specific. Using negative numbers in the Delete Specific box will KEEP that many portals (starting counting backwards from the current one), ie: if you have Portals 1000-1015, typing -10 will keep 1005-1015. You can also delete portals by challenge name, matches are non case sensitive and allow partial matches, ie coord matches Coordinated."
-			universeFooter.innerHTML += `
-    <span><button onclick="Graphs.ChartArea.draw()" style="margin-left:0.5em;">Refresh</button></span>
-    <span style="flex:0 100 5%;"></span>
-    <span><input type="checkbox" id="clrChkbox" onclick="Graphs.UI.toggleClearButton();"></span>
-    <span style="margin-left: 0.5vw;">
-      <button id="clrAllDataBtn" onclick="Graphs.Backend.clearData(null,true); Graphs.ChartArea.draw();" class="btn" disabled="" style="flex:auto; padding: 2px 6px;border: 1px solid white;">
-        Clear All U1 Data</button></span>
-    <span style="flex:0 100 5%;"></span>
-		
-    <span style="flex:0 2 3.5vw;"><input style="width:100%;min-width: 40px;" id="deleteSpecificTextBox"></span>
-    <span style="flex:auto; margin-left: 0.5vw;" onmouseover='tooltip("Tips", "customText", event, "${tipsTextDel}")' onmouseout='tooltip("hide")'><button id="deleteSpecificBtn" onclick="Graphs.Backend.deleteSpecific(); Graphs.ChartArea.draw();">Delete Specific U1 Portals</button></span>
-		
-    <span style="float:right; margin-right: 0.5vw;" ><button onclick="Graphs.ChartArea.toggleSpecific()">Invert Selection</button></span>
-    <span style="float:right; margin-right: 1vw;"><button onclick="Graphs.ChartArea.toggleAll()">All Off/On</button></span>
-    <button onclick="Graphs.UI.importExportGraphsDialog()">Import/Export</button>`
-
-
-			// AAAAAAAAAAAAAAAAAAAAAAAAAAAA (Setting the inner HTML of the parent element resets the value of these? what the fuck)
-			// default to Current Universe + Clear Time if no user data exists
-			document.querySelector("#universeSelection").value = Graphs.Settings.universeSelection || "Universe " + GraphsConfig.getGameData.universe();
-			document.querySelector("#u1graphSelection").value = Graphs.Settings.u1graphSelection || "Clear Time";
-			document.querySelector("#u2graphSelection").value = Graphs.Settings.u2graphSelection || "Clear Time";
-
 			var tipsText = "You can zoom by dragging a box around an area. You can turn portals off by clicking them on the legend, or double click to turn on/off all of the same challenge. Quickly view the last portal by clicking it off, then Invert Selection. Or by clicking All Off, then clicking the portal on. Double clicking a portal turns on all of the same type."
-			document.getElementById("graphFooterLine2").innerHTML += `
-    <span style="float: left;" onmouseover='tooltip("Tips", "customText", event, "${tipsText}")' onmouseout='tooltip("hide")'>Tips: Hover for usage tips.</span>
-    <span style="float: left; margin-left: 2vw"><input type="checkbox" id="liveCheckbox" onclick="Graphs.Backend.saveSetting('live', this.checked);"> Live Updates</span>
-    <span style="float: left; margin-left: 2vw">Displayed Portals: <input style="width:40px;" id="portalCountTextBox" onchange="Graphs.Backend.saveSetting('portalsDisplayed', this.value); Graphs.ChartArea.update();"></span>
-    <span style="float: left; margin-left: 2vw">Saved Portals: <input style="width:40px;" id="portalsSavedTextBox" onchange="Graphs.Backend.saveSetting('maxGraphs', this.value); Graphs.Backend.clearData(this.value); Graphs.ChartArea.update();"></span>
-    <input onclick="Graphs.UI.toggleDarkGraphs()" style="height: 20px; float: right; margin-right: 0.5vw;" type="checkbox" id="blackCB">
-    <span style="float: right; margin-right: 0.5vw;">Black Graphs:</span>
-    `;
 
-			// Add a header with negative float hanging down on the top of the graph, for toggle buttons
-			var toggleDiv = document.createElement("div");
-			toggleDiv.id = "toggleDiv";
-			toggleDiv.setAttribute("style", "position: absolute; top: 1rem; left: 3rem; z-index: 1;")
-			toggleDiv.innerText = ""
-			document.querySelector("#graphParent").appendChild(toggleDiv);
+			const GraphUIEvents = [
+				["click", "GraphsRefresh", function () { Graphs.ChartArea.draw() }],
+				["click", "clrChkbox", function () { Graphs.UI.toggleClearButton() }],
+				["click", "clrAllDataBtn", function () { Graphs.Backend.clearData("null", true); Graphs.ChartArea.draw(); }],
+				["click", "deleteSpecificBtn", function () { Graphs.Backend.deleteSpecific(); Graphs.ChartArea.draw() }],
+				["click", "GraphsInvertSelection", function () { Graphs.ChartArea.toggleSpecific() }],
+				["click", "GraphsToggleAll", function () { Graphs.ChartArea.toggleAll() }],
+				["click", "GraphsExport", function () { Graphs.UI.importExportGraphsDialog() }],
+				["click", "liveCheckbox", function () { Graphs.Backend.saveSetting('live', this.checked) }],
+				["click", "blackCB", function () { Graphs.UI.toggleDarkGraphs() }],
+				["mouseover", "deleteSpecificCont", function () { tooltip("Tips", "customText", event, `${tipsTextDel}`) }],
+				["mouseover", "GraphsTips", function () { tooltip("Tips", "customText", event, `${tipsText}`) }],
+				["change", "portalCountTextBox", function () { Graphs.Backend.saveSetting('portalsDisplayed', this.value); Graphs.ChartArea.update(); }],
+				["change", "portalsSavedTextBox", function () { Graphs.Backend.saveSetting('maxGraphs', this.value); Graphs.Backend.clearData(this.value); Graphs.ChartArea.update(); }],
+			]
 
+			for (const [eventType, elemID, eventFunc] of GraphUIEvents) {
+				let targetElem = document.getElementById(elemID)
+				targetElem.addEventListener(eventType, eventFunc)
+				if (eventType === "mouseover") {
+					targetElem.addEventListener("mouseout", function () { tooltip("hide"); })
+				}
+			}
 
-			// Adjust UI elements for Trimps Theme changes
-
-
+			// Set toggles to saved values
 			document.querySelector("#blackCB").checked = Graphs.Settings.darkTheme;
 			document.querySelector("#portalCountTextBox").value = Graphs.Settings.portalsDisplayed;
 			document.querySelector("#portalsSavedTextBox").value = Graphs.Settings.maxGraphs;
 			document.querySelector("#liveCheckbox").checked = Graphs.Settings.live;
-			this.themeChanged();
 
+			this.themeChanged();
 			this.showHideUnused()
 		},
 
 		themeChanged: function () {
+			// Adjust UI elements for Trimps Theme changes
+			// TODO should really be called on theme changed, not just on load
 			if (game && game.options.menu.darkTheme.enabled != this._lastTheme) {
 				function f(h) {
 					h.style.color = 2 == game.options.menu.darkTheme.enabled ? "" : "black";
@@ -375,7 +468,7 @@ const Graphs = {
 				Graphs.UI.toggleDarkGraphs();
 				var c = document.querySelector("#graphParent").getElementsByTagName("input");
 				var d = document.querySelector("#graphParent").getElementsByTagName("select");
-				var e = document.querySelector("#graphFooterLine1").children;
+				var e = document.querySelector("#graphFooter").children;
 				for (var h of c) f(h);
 				for (var h of d) f(h);
 				for (var h of e) f(h);
@@ -428,9 +521,9 @@ const Graphs = {
 				var elem = document.getElementById(elemId);
 				if (!elem) continue;
 				if (elemId === "graphParent") { // toggle Graphs window
-					var open = elem.style.display === "block";
+					var open = elem.style.display === "grid";
 					if (escPressed) open = true; // override to always close
-					elem.style.display = open ? "none" : "block";
+					elem.style.display = open ? "none" : "grid";
 					Graphs.Settings.open = !open;
 					trimpStatsDisplayed = !open; // HACKS disable hotkeys without touching Trimps settings
 				}
@@ -489,18 +582,20 @@ const Graphs = {
 				var label = document.createElement("span");
 
 				container.style.padding = "0rem .5rem";
-
 				checkbox.type = "checkbox";
 				checkbox.id = toggle;
 				// initialize the checkbox to saved value
 				checkbox.checked = Graphs.Settings.toggles[graph][toggle];
+
 				// create a godawful inline function to set saved value on change, apply exclusions, and update the graph
-				var funcString = "";
-				if (GraphsConfig.toggledGraphs[toggle] && GraphsConfig.toggledGraphs[toggle].exclude) {
-					GraphsConfig.toggledGraphs[toggle].exclude.forEach(exTog => funcString += `Graphs.Settings.toggles.${graph}.${exTog} = false; `)
+				function manageCheckbox() {
+					if (GraphsConfig.toggledGraphs[toggle] && GraphsConfig.toggledGraphs[toggle].exclude) {
+						GraphsConfig.toggledGraphs[toggle].exclude.forEach(exTog => Graphs.Settings.toggles[graph][exTog] = false)
+					}
+					Graphs.Settings.toggles[graph][toggle] = this.checked;
+					Graphs.ChartArea.draw();
 				}
-				funcString += `Graphs.Settings.toggles.${graph}.${toggle} = this.checked; Graphs.ChartArea.draw();`
-				checkbox.setAttribute("onclick", funcString);
+				checkbox.addEventListener("click", manageCheckbox)
 
 				label.innerText = toggle;
 				label.style.color = "#757575";
@@ -1220,7 +1315,7 @@ const GraphsConfig = {
 		}
 		),
 		new Graphs.Graph("mutatedSeeds", 2, "Mutated Seeds", {
-			conditional: () => { return GraphsConfig.getGameData.u2hze() >= 200 },
+			conditional: () => { return GraphsConfig.getGameData.u2hze() >= 190 },
 			customFunction: (portal, i) => { return Graphs.diff("mutatedSeeds", portal.initialMutes)(portal, i) },
 			toggles: ["perHr", "perZone"],
 			xminFloor: 200,
