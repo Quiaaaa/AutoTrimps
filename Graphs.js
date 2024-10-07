@@ -348,7 +348,7 @@ const Graphs = {
 			graphsButton.addEventListener("click", function () { Graphs.UI.escapeATWindows(false); Graphs.ChartArea.draw(); Graphs.UI.swapGraphUniverse(); });
 
 			// insert after Achievements
-			document.getElementById("settingsTable").firstElementChild.firstElementChild.childNodes[9].insertAdjacentElement("afterend", graphsButton);
+			document.querySelector("#settingsTable>*>*>:nth-child(5)").insertAdjacentElement("afterend", graphsButton);
 
 			/* 
 			Layout is a 3 column, 4 row grid
