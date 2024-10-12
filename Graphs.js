@@ -903,20 +903,20 @@ const Graphs = {
 				if (!activeDataVars.some(dvar => dvar in portal.perZoneData)) continue; // ignore completely blank
 				if (portal.universe != Graphs.Settings.universeSelection) continue; // ignore inactive universe
 				var cleanData = [];
-				// parse the requested datavar
 				var xprev = 0;
-				for (const index in portal.perZoneData[item]) {
-					var x = portal.perZoneData[item][index];
-					var time = portal.perZoneData.currentTime[index];
+				// parse the requested datavar
+				for (const zone in portal.perZoneData[item]) {
+					var x = portal.perZoneData[item][zone];
+					var time = portal.perZoneData.currentTime[zone];
 					if (typeof this.customFunction === "function") {
-						x = this.customFunction(portal, index);
+						x = this.customFunction(portal, zone);
 						if (x < 0) x = null;
 					}
 					// TOGGLES
 					// handle toggles that replace whole data vars first
 					for (var toggle of activeToggles) {
 						if (["perZone", "perHr"].includes(toggle)) continue;
-						try { x = GraphsConfig.toggledGraphs[toggle].customFunction(portal, item, index, x, time, maxS3, xprev); }
+						try { x = GraphsConfig.toggledGraphs[toggle].customFunction(portal, item, zone, x, time, maxS3, xprev); }
 						catch (e) {
 							x = 0;
 							Graphs.debugMsg(`Error graphing data on: ${item} ${toggle}, ${e.message}`)
@@ -925,19 +925,28 @@ const Graphs = {
 					// handle special time and X modifying toggles
 					originalx = x // save before modifiers for perZone use
 					if (activeToggles.includes("perZone")) {  // must always be first 
-						[x, time] = GraphsConfig.toggledGraphs.perZone.customFunction(portal, item, index, x, false, false, xprev);
+						[x, time] = GraphsConfig.toggledGraphs.perZone.customFunction(portal, item, zone, x, false, false, xprev);
 					}
 					if (activeToggles.includes("perHr")) {  // must always be first 
-						x = GraphsConfig.toggledGraphs.perHr.customFunction(portal, item, index, x, time, maxS3, xprev);
+						x = GraphsConfig.toggledGraphs.perHr.customFunction(portal, item, zone, x, time, maxS3, xprev);
 					}
 					xprev = originalx;
 					//if (this.useAccumulator) { x += last(cleanData) !== undefined ? last(cleanData)[1] : 0; }
 					if (this.typeCheck && typeof x != this.typeCheck) x = null;
-					cleanData.push([Number(index), x]) // highcharts expects number, number, not str, number
+					cleanData.push([Number(zone), x]) // highcharts expects number, number, not str, number
 				}
 				if (activeToggles.includes("perZone") && ["fluffy", "scruffy"].includes(item)) {
 					cleanData.splice(cleanData.length - 1); // current zone is too erratic to include due to weird order of granting fluffy exp 
 				}
+
+				//check for empty data and discard portal
+				const uniqueData = new Set(cleanData.map(([zone, data]) => { return data }))
+				uniqueData.delete(null); uniqueData.delete(0);
+				if (uniqueData.size === 0) {
+					Graphs.debugMsg("u" + portal.universe, portal.totalPortals, item, "is blank, not displaying")
+					continue;
+				}
+
 				this.graphData.push({
 					name: `Portal ${portal.totalPortals}: ${portal.challenge}`,
 					data: cleanData,
