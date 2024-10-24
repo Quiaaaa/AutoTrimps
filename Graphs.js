@@ -264,6 +264,9 @@ const Graphs = {
 					grid-template-columns: repeat(3,  minmax(1fr, max-content));
 					grid-template-rows: 2.5em 1fr 2.5em 2.5em;
 					font-size: 1em;
+					border-top: gray;
+					border-top-width: .2em;
+					border-top-style: solid;
 				}
 
 				#toggleDiv {
@@ -498,7 +501,7 @@ const Graphs = {
 			// Toggle AT windows with UI, or force close with Esc
 			var a = document.getElementById("tooltipDiv");
 			if (a.style.display != "none") return void cancelTooltip(); // old code, uncertain what it's for or why it's here.
-			for (elemId of ["autoSettings", "autoTrimpsTabBarMenu", "graphParent"]) {
+			for (elemId of ["autoSettings", "autoTrimpsTabBarMenu", "settingsHere", "graphParent"]) {
 				var elem = document.getElementById(elemId);
 				if (!elem) continue;
 				if (elemId === "graphParent") { // toggle Graphs window
