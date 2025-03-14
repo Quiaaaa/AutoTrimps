@@ -968,7 +968,7 @@ const Graphs = {
 				const uniqueData = new Set(cleanData.map(([zone, data]) => { return data }))
 				uniqueData.delete(null); uniqueData.delete(0);
 				if (uniqueData.size === 0) {
-					Graphs.debugMsg("u" + portal.universe, portal.totalPortals, item, "is blank, not displaying")
+					//Graphs.debugMsg("u" + portal.universe, portal.totalPortals, item, "is blank, not displaying")
 					continue;
 				}
 				this.graphData.push({
@@ -1589,7 +1589,7 @@ const GraphsConfig = {
 			customFunction: (portal, item, index, x) => {
 				let universe = portal.universe
 				let hze = (universe == 1 ? portal.u1hze : portal.u2hze);
-				if (!hze) {
+				if (!hze && portal.totalPortals > 1) {
 					hze = Graphs.portalSaveData[`u${universe} p${portal.totalPortals-1}`].perZoneData.currentTime.length - 1;
 				}
 				if (hze > 200) hze = 200
