@@ -328,9 +328,8 @@ const Graphs = {
 					border-radius: 0px;
 					border: 1px solid white;
 				}
-
-				#graphParent input[type=checkbox] {
-				  appearance: auto !important;
+				#graphParent .niceCheckbox  {
+					margin-right: 3px;
 				}
 			`;
 			document.head.appendChild(styleElem);
@@ -375,7 +374,7 @@ const Graphs = {
 						</div>
 						<div class="footerCenter footerR1">
 							<span class="btnContainer">
-								<input id="clrChkbox" type="checkbox">
+							  <span id="clrChkbox" type="checkbox" class="icomoon icon-checkbox-unchecked niceCheckbox" data-checked="false"></span>
 								<button id="clrAllDataBtn" class="btn" disabled="">Clear All U1 Data</button>
 							</span>
 							<span class="btnContainer" id="deleteSpecificCont">
@@ -392,14 +391,14 @@ const Graphs = {
 						</div>
 						<div class="footerLeft footerR2">
 							<button id="GraphsRefresh" class="btnContainer">Refresh</button>
-							<span class="btnContainer"><input type="checkbox" id="liveCheckbox">Live Updates</span>
+							<span class="btnContainer"><span type="checkbox" id="liveCheckbox" class="icomoon icon-checkbox-unchecked niceCheckbox" data-checked="false"></span>Live Updates</span>
 						</div>
 						<div class="footerCenter footerR2">
 							<span class="btnContainer"><input id="portalCountTextBox">Displayed Portals</span>
 							<span class="btnContainer"><input id="portalsSavedTextBox">Saved Portals</span>
 						</div>
 						<div class="footerRight footerR2">
-							<span class="btnContainer"><input id="blackCB" type="checkbox">Black Graphs</span>
+							<span class="btnContainer"><span id="blackCB" type="checkbox" class="icomoon icon-checkbox-unchecked niceCheckbox" data-checked="false"></span>Black Graphs</span>
 						</div>
 					</div>
 				</div>
@@ -432,16 +431,17 @@ const Graphs = {
 			var GraphsTipsDelete = "To delete a portal, type its portal number in the box and press Delete Specific. Using negative numbers in the Delete Specific box will keep that many portals (starting counting backwards from the current one), ie: if you have Portals 1000-1015, typing -10 will keep 1005-1015. <br> You can also delete portals by challenge name, matches are non case sensitive and allow partial matches, ie coord matches Coordinated."
 			var GraphsTips = "You can zoom by dragging a box around an area. You can toggle portals by clicking them on the legend, or double click to toggle all of the same challenge. <br> Quickly view the last portal by clicking it off, then Invert Selection. Or by clicking All Off, then clicking the portal on."
 
+			
 			const GraphUIEvents = [
 				["click", "GraphsRefresh", function () { Graphs.ChartArea.draw() }],
-				["click", "clrChkbox", function () { Graphs.UI.toggleClearButton() }],
+				["click", "clrChkbox", function () { swapNiceCheckbox(this); Graphs.UI.toggleClearButton() }],
 				["click", "clrAllDataBtn", function () { Graphs.Backend.clearData("null", true); Graphs.ChartArea.draw(); }],
 				["click", "deleteSpecificBtn", function () { Graphs.Backend.deleteSpecific(); Graphs.ChartArea.draw() }],
 				["click", "GraphsInvertSelection", function () { Graphs.ChartArea.toggleSpecific() }],
 				["click", "GraphsToggleAll", function () { Graphs.ChartArea.toggleAll() }],
 				["click", "GraphsExport", function () { Graphs.UI.importExportGraphsDialog() }],
-				["click", "liveCheckbox", function () { Graphs.Backend.saveSetting('live', this.checked) }],
-				["click", "blackCB", function () { Graphs.UI.toggleDarkGraphs() }],
+				["click", "liveCheckbox", function () { swapNiceCheckbox(this); Graphs.Backend.saveSetting('live', readNiceCheckbox(this)) }],
+				["click", "blackCB", function () { swapNiceCheckbox(this); Graphs.UI.toggleDarkGraphs() }],
 				["mouseover", "deleteSpecificCont", function () { tooltip("Tips", "customText", event, `${GraphsTipsDelete}`) }],
 				["mouseover", "GraphsLegendCtrl", function () { tooltip("Tips", "customText", event, `${GraphsTips}`) }],
 				["change", "portalCountTextBox", function () { Graphs.Backend.saveSetting('portalsDisplayed', this.value); Graphs.ChartArea.update(); }],
@@ -457,10 +457,10 @@ const Graphs = {
 			}
 
 			// Set toggles to saved values
-			document.querySelector("#blackCB").checked = Graphs.Settings.darkTheme;
+			swapNiceCheckbox(document.querySelector("#blackCB"), Graphs.Settings.darkTheme);
 			document.querySelector("#portalCountTextBox").value = Graphs.Settings.portalsDisplayed;
 			document.querySelector("#portalsSavedTextBox").value = Graphs.Settings.maxGraphs;
-			document.querySelector("#liveCheckbox").checked = Graphs.Settings.live;
+			swapNiceCheckbox(document.querySelector("#liveCheckbox"), Graphs.Settings.live);
 
 			this.toggleDarkGraphs();
 			this.showHideUnused()
@@ -478,13 +478,13 @@ const Graphs = {
 		},
 
 		toggleClearButton: function () {
-			document.getElementById("clrAllDataBtn").disabled = !document.getElementById("clrChkbox").checked;
+			document.getElementById("clrAllDataBtn").disabled = !readNiceCheckbox(document.getElementById("clrChkbox"));
 		},
 
 		toggleDarkGraphs: function () {
 			if (game) {
 				var darkcss = document.getElementById("dark-graph.css")
-				var dark = document.getElementById("blackCB").checked;
+				var dark = readNiceCheckbox(document.getElementById("blackCB"));
 				Graphs.Backend.saveSetting("darkTheme", dark)
 				if (!darkcss && dark) {
 					var b = document.createElement("link");
@@ -570,36 +570,29 @@ const Graphs = {
 			}
 		},
 
+		// set saved value on change, apply exclusions, and update the graph
+		manageCheckbox(graph, toggle) {
+			// turn off excluded toggles, if they exist
+			if (GraphsConfig.toggledGraphs[toggle] && GraphsConfig.toggledGraphs[toggle].exclude) {
+				GraphsConfig.toggledGraphs[toggle].exclude.forEach(exTog => Graphs.Settings.toggles[graph][exTog] = false)
+			}
+			Graphs.Settings.toggles[graph][toggle] = readNiceCheckbox(document.getElementById(toggle));
+			Graphs.ChartArea.draw();
+		},
+
 		draw: function () {
 			// Draws the graph currently selected by the user
-			function makeCheckbox(graph, toggle) {
+			function _makeCheckbox(graph, toggle) {
 				// TOGGLES
 				// create checkbox element labeled with the toggle
 				var container = document.createElement("span")
-				var checkbox = document.createElement("input");
-				var label = document.createElement("span");
-
 				container.style.padding = "0rem .5rem";
-				checkbox.className = "graphsCheckbox"
-				checkbox.type = "checkbox";
-				checkbox.id = toggle;
-				// initialize the checkbox to saved value
-				checkbox.checked = Graphs.Settings.toggles[graph][toggle];
-
-				// create a godawful inline function to set saved value on change, apply exclusions, and update the graph
-				function manageCheckbox() {
-					if (GraphsConfig.toggledGraphs[toggle] && GraphsConfig.toggledGraphs[toggle].exclude) {
-						GraphsConfig.toggledGraphs[toggle].exclude.forEach(exTog => Graphs.Settings.toggles[graph][exTog] = false)
-					}
-					Graphs.Settings.toggles[graph][toggle] = this.checked;
-					Graphs.ChartArea.draw();
-				}
-				checkbox.addEventListener("click", manageCheckbox)
-
+				var label = document.createElement("span");
 				label.innerText = toggle;
 				label.style.color = "#757575";
-
-				container.appendChild(checkbox)
+				var checkbox = buildNiceCheckbox(toggle, false, Graphs.Settings.toggles[graph][toggle], `Graphs.ChartArea.manageCheckbox("${graph}", "${toggle}");`)
+				
+				container.insertAdjacentHTML("afterbegin", checkbox)
 				container.appendChild(label)
 				return container;
 			}
@@ -615,7 +608,7 @@ const Graphs = {
 				toggleDiv.innerHTML = "";
 				if (graph.toggles) {
 					for (const toggle of graph.toggles) {
-						toggleDiv.appendChild(makeCheckbox(graph.id, toggle))
+						toggleDiv.appendChild(_makeCheckbox(graph.id, toggle))
 					}
 				}
 			}
@@ -1189,8 +1182,6 @@ const Graphs = {
 			console.log("Mapping data format updated")
 		}
 	},
-
-
 }
 
 const GraphsConfig = {
@@ -1678,16 +1669,17 @@ abandonChallenge = function () {
 }
 
 // collect map helium data
+// TODO needs handling for challenge/daily finish
 var originalrewardResource = rewardResource;
 rewardResource = function () {
-	if (arguments[0] === "helium" && game.global.mapsActive) {
+	if (arguments[0] === "helium" && game.global.mapsActive) { 
 		try {
 			var initial = GraphsConfig.getGameData.heliumOwned() || GraphsConfig.getGameData.radonOwned();
 		}
 		catch (e) { Graphs.debugMsg("Gather info failed: Cthulimp: ", e) }
 	}
 	var output = originalrewardResource(...arguments) // always call the original function
-	if (arguments[0] === "helium" && game.global.mapsActive) {
+	if (arguments[0] === "helium" && game.global.mapsActive) { 
 		try {
 			var final = GraphsConfig.getGameData.heliumOwned() || GraphsConfig.getGameData.radonOwned();
 			var gas = GraphsConfig.getGameData.heliumOwned() ? "heliumOwned" : "radonOwned";
