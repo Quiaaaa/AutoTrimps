@@ -1191,7 +1191,7 @@ const GraphsConfig = {
 	// To make a new toggle, add the required logic to toggledGraphs
 
 	// hopefully complete, not verified
-	stackChallenges: { Balance: "balanceStacks", Decay: "stacks", Life: "stacks", Toxicity: "stacks", Frigid: "warmth", Unbalance: "balanceStacks", Melt: "stacks", Quagmire: "exhaustedStacks", Wither: "trimpStacks", Revenge: "stacks", Mayhem: "stacks", Storm: "totalClouds", Insanity: "insanity", Berserk: "weakened", Exterminate: "swarmStacks", Pandemonium: "pandemonium", Smithless: "fakeSmithies", Desolation: "chilled", Nurture: "level", },
+	stackChallenges: { Balance: "balanceStacks", Decay: "stacks", Life: "stacks", Toxicity: "stacks", Frigid: "warmth", Unbalance: "balanceStacks", Melt: "stacks", Quagmire: "exhaustedStacks", Wither: "trimpStacks", Revenge: "stacks", Mayhem: "stacks", Storm: "totalClouds", Insanity: "insanity", Berserk: "weakened", Exterminate: "swarmStacks", Pandemonium: "pandemonium", Smithless: "fakeSmithies", Desolation: "chilled", Nurture: "level", Experience: "wonders"},
 
 	getGameData: {
 		currentTime: () => { return getGameTime() - game.global.portalTime }, // portalTime changes on pause, 'when a portal started' is not a static concept
@@ -1312,8 +1312,9 @@ const GraphsConfig = {
 		}),
 		new Graphs.Graph("amals", 1, "Amalgamators"),
 		new Graphs.Graph("wonders", 1, "Wonders", {
-			conditional: () => { return GraphsConfig.getGameData.challengeActive() === "Experience" },
+			conditional: () => { return false }, //GraphsConfig.getGameData.challengeActive() === "Experience"
 			xminFloor: 300,
+			graphTitle: "Wonders (Depreciated in favor of Challenge Stacks)"
 		}),
 
 		// U2 Graphs
