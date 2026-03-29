@@ -338,12 +338,13 @@ const Graphs = {
 		createUI: function () {
 			// Create all of the UI elements and load in scripts needed
 
-			for (const source of ["https://code.highcharts.com/11.1.0/highcharts.js", "https://code.highcharts.com/11.1.0/modules/boost.js"]) {
+			for (const script of ["highcharts", "boost"]) {
 				var chartscript = document.createElement("script");
 				chartscript.type = "text/javascript";
-				chartscript.src = source
-				chartscript.async = false
-				document.head.appendChild(chartscript);
+				chartscript.src = ['https://Quiaaaa.github.io/AutoTrimps/', 'highcharts/', script, '.js'].join("");
+				chartscript.async = false;
+				chartscript.id = script;
+				document.head.appendChild( chartscript);
 			}
 
 			this._createStyles();
